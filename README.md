@@ -16,8 +16,8 @@ This project implements an intelligent document search and question-answering sy
 - Support for multilingual queries and documents
 
 ## Prerequisites
-- Python 3.8+
-- Elasticsearch 8.x
+- Python 3.11+
+- Elasticsearch 8.x running locally
 - Anthropic API Key (Claude-3 access required)
 
 ## Installation
@@ -32,6 +32,11 @@ pip install -r requirements.txt
 ANTHROPIC_API_KEY=your_anthropic_api_key
 ELASTICSEARCH_HOST=localhost
 ELASTICSEARCH_PORT=9200
+```
+
+4. install elasticsearch:
+```
+docker run -d --name elasticsearch -p 9200:9200 -p 9300:9300 -e discovery.type=single-node -e xpack.security.enabled=false elasticsearch:8.12.1
 ```
 
 ## Usage
