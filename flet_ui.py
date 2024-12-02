@@ -136,6 +136,22 @@ class SearchAgentUI:
                                         step['description'],
                                         color=ft.colors.GREY_800,
                                         size=14
+                                    ),
+                                    # Add detailed explanation for evaluation step
+                                    ft.Container(
+                                        content=ft.Text(
+                                            step.get('explanation', ''),
+                                            color=ft.colors.GREY_700,
+                                            size=12,
+                                            italic=True
+                                        ),
+                                        visible=step['action'].startswith('Result Evaluation')
+                                    ),
+                                    # Add results display
+                                    ft.Container(
+                                        content=self._create_results_view(step.get('results', [])),
+                                        padding=ft.padding.only(left=20, top=10),
+                                        visible=bool(step.get('results'))
                                     )
                                 ]),
                                 expand=True
@@ -331,6 +347,93 @@ class SearchAgentUI:
                                 break
         
         e.page.update()
+
+    def _create_results_view(self, results):
+        """Create a visual representation of step results"""
+        result_widgets = []
+        
+        for result in results:
+            if result['type'] == 'keywords':
+                # Display keywords as chips
+                result_widgets.append(
+                    ft.Row(
+                        controls=[
+                            ft.Container(
+                                content=ft.Text(keyword, size=12),
+                                bgcolor=ft.colors.BLUE_50,
+                                padding=ft.padding.all(5),
+                                border_radius=15
+                            )
+                            for keyword in result['content']
+                        ],
+                        wrap=True,
+                        spacing=5
+                    )
+                )
+            
+            elif result['type'] == 'document':
+                # Display document result with title and highlight
+                content = result['content']
+                result_widgets.append(
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Text(f"📄 {content['title']}", size=12, weight=ft.FontWeight.BOLD),
+                            ft.Text(f"Score: {content['score']}", size=11, color=ft.colors.GREY_700),
+                            *[ft.Text(
+                                highlight, 
+                                size=11, 
+                                color=ft.colors.GREY_800,
+                                max_lines=2,
+                                overflow=ft.TextOverflow.ELLIPSIS
+                            ) for highlight in content['highlights']]
+                        ]),
+                        padding=ft.padding.all(5),
+                        border=ft.border.all(1, ft.colors.BLUE_100),
+                        border_radius=5,
+                        margin=ft.margin.only(bottom=5)
+                    )
+                )
+            
+            elif result['type'] == 'evaluation':
+                # Display evaluation status
+                content = result['content']
+                icon = ft.icons.CHECK_CIRCLE if content['status'] == 'accepted' else ft.icons.REFRESH
+                color = ft.colors.GREEN_400 if content['status'] == 'accepted' else ft.colors.ORANGE_400
+                result_widgets.append(
+                    ft.Row([
+                        ft.Icon(icon, color=color, size=16),
+                        ft.Text(
+                            f"Confidence: {content['confidence']}",
+                            color=color,
+                            size=12
+                        )
+                    ])
+                )
+            
+            elif result['type'] == 'next_keywords':
+                # Display next keywords to try
+                result_widgets.append(
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Text("Trying next:", size=11, color=ft.colors.GREY_700),
+                            ft.Row(
+                                controls=[
+                                    ft.Container(
+                                        content=ft.Text(keyword, size=11),
+                                        bgcolor=ft.colors.ORANGE_50,
+                                        padding=ft.padding.all(5),
+                                        border_radius=15
+                                    )
+                                    for keyword in result['content']
+                                ],
+                                wrap=True,
+                                spacing=5
+                            )
+                        ])
+                    )
+                )
+        
+        return ft.Column(controls=result_widgets, spacing=5)
 
     def main(self, page: ft.Page):
         # Store page reference

@@ -79,7 +79,7 @@ class SearchAgent:
                     if word.lower() not in stop_words and len(word) > 1]
             return words[:5] if words else [query.lower()]
 
-    def evaluate_results(self, results: List[Dict[str, Any]], query: str) -> Tuple[bool, Optional[str]]:
+    def evaluate_results(self, results: List[Dict[str, Any]], query: str) -> Tuple[bool, Optional[str], Optional[str]]:
         """Evaluate search results using Claude with confidence scoring"""
         if not results:
             return False, "No results found"
@@ -123,7 +123,7 @@ class SearchAgent:
             self.logger.info(f"Evaluation: Confidence={confidence}, Decision={decision}")
             self.logger.info(f"Explanation: {explanation}")
             
-            return is_good, new_keywords
+            return is_good, new_keywords, explanation
             
         except Exception as e:
             self.logger.error(f"Error evaluating results: {e}")
@@ -176,11 +176,13 @@ class SearchAgent:
         # Step 1: Extract keywords
         steps.append({
             "action": "Keyword Extraction",
-            "description": "Extracting search keywords from the query..."
+            "description": "Extracting search keywords from the query...",
+            "results": []
         })
         keywords = self.extract_keywords(query, failed_keywords)
-        steps[-1]["description"] = f"Extracted keywords: {', '.join(keywords)}"
-        
+        steps[-1]["description"] = f"✓ Keywords extracted"
+        steps[-1]["results"] = [{"type": "keywords", "content": keywords}]
+
         while attempt < self.max_search_attempts:
             self.logger.info(f"Search attempt {attempt + 1} with keywords: {keywords}")
             
@@ -188,12 +190,14 @@ class SearchAgent:
                 # Step 2: Search documents
                 steps.append({
                     "action": f"Document Search (Attempt {attempt + 1})",
-                    "description": f"Searching documents with keywords: {', '.join(keywords)}..."
+                    "description": f"Searching documents with keywords: {', '.join(keywords)}...",
+                    "results": []
                 })
                 results = self.indexer.search_documents(" ".join(keywords))
                 
                 if not results:
-                    steps[-1]["description"] = f"No documents found matching keywords: {', '.join(keywords)}"
+                    steps[-1]["description"] = f"⚠ No documents found"
+                    steps[-1]["results"] = [{"type": "no_results", "content": f"No matches for keywords: {', '.join(keywords)}"}]
                     failed_keywords.extend(keywords)
                     if attempt == self.max_search_attempts - 1:
                         final_msg = "I couldn't find any relevant documents that match your query. Please try:\n" \
@@ -210,14 +214,40 @@ class SearchAgent:
                     keywords = self.extract_keywords(query, failed_keywords)
                     continue
                 
-                steps[-1]["description"] += f"\nFound {len(results)} results"
+                steps[-1]["description"] = f"✓ Found {len(results)} documents"
+                steps[-1]["results"] = [
+                    {
+                        "type": "document",
+                        "content": {
+                            "title": result.get("filename", "Untitled"),
+                            "score": f"{result.get('score', 0):.2f}",
+                            "highlights": result.get("highlights", [])[:1]  # Show first highlight only
+                        }
+                    }
+                    for result in results[:3]  # Show top 3 results
+                ]
                 
                 # Step 3: Evaluate results
                 steps.append({
                     "action": "Result Evaluation",
-                    "description": "Evaluating search results quality..."
+                    "description": "Evaluating search results quality...",
+                    "explanation": "",
+                    "results": []
                 })
-                is_good, new_keywords = self.evaluate_results(results, query)
+                is_good, new_keywords, explanation = self.evaluate_results(results, query)
+                
+                if is_good:
+                    steps[-1]["description"] = "✓ Search results are relevant and sufficient"
+                    steps[-1]["explanation"] = explanation
+                    steps[-1]["results"] = [{"type": "evaluation", "content": {"confidence": "high", "status": "accepted"}}]
+                else:
+                    steps[-1]["description"] = "⚠ Results need refinement"
+                    steps[-1]["explanation"] = explanation
+                    next_keywords = new_keywords if new_keywords else self.extract_keywords(query, failed_keywords)
+                    steps[-1]["results"] = [
+                        {"type": "evaluation", "content": {"confidence": "low", "status": "refining"}},
+                        {"type": "next_keywords", "content": next_keywords}
+                    ]
                 
                 if is_good:
                     # Step 4: Generate answer
@@ -232,19 +262,15 @@ class SearchAgent:
                         "steps": steps,
                         "answer": answer,
                         "sources": [{
-                            "title": result.get("title", "Untitled"),
+                            "title": result.get("filename", "Untitled"),
                             "path": result.get("path", "Unknown"),
                             "highlights": result.get("highlights", []),
                             "score": result.get("score", 0)
                         } for result in results]
                     }
                 
-                steps[-1]["description"] = "Results not satisfactory, refining search..."
-                if new_keywords:
-                    keywords = new_keywords
-                else:
-                    failed_keywords.extend(keywords)
-                    keywords = self.extract_keywords(query, failed_keywords)
+                failed_keywords.extend(keywords)
+                keywords = new_keywords if new_keywords else self.extract_keywords(query, failed_keywords)
                 
                 attempt += 1
                 
