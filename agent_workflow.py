@@ -33,18 +33,32 @@ class SearchAgent:
                     "content": f"""Extract 3-5 most important search keywords from this question. 
                     Consider synonyms and related terms that might help find relevant information.
                     Return only the keywords separated by spaces, no other text.
+                    IMPORTANT: Do not split individual words into letters.
                     Question: {query}"""
                 }]
             )
             keywords = message.content[0].text.strip().split()
+            if not keywords:  # If Claude returns empty or only spaces
+                # Simple fallback: split by spaces and take first 5 words, excluding stop words
+                stop_words = {'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 
+                            'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 
+                            'to', 'was', 'were', 'will', 'with'}
+                words = [word.lower() for word in query.split() 
+                        if word.lower() not in stop_words and len(word) > 1]
+                keywords = words[:5] if words else [query.lower()]  # Use full query if no valid words
+            
             self.logger.info(f"Extracted keywords: {keywords}")
             return keywords
             
         except Exception as e:
             self.logger.error(f"Error extracting keywords: {e}")
-            # Fallback to simple word extraction
-            words = query.lower().split()
-            return words[:5]
+            # Improved fallback with stop words filtering
+            stop_words = {'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 
+                        'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 
+                        'to', 'was', 'were', 'will', 'with'}
+            words = [word.lower() for word in query.split() 
+                    if word.lower() not in stop_words and len(word) > 1]
+            return words[:5] if words else [query.lower()]  # Use full query if no valid words
 
     def evaluate_results(self, results: List[Dict[str, Any]], query: str) -> Tuple[bool, Optional[str]]:
         """Evaluate search results using Claude with confidence scoring"""
@@ -134,35 +148,113 @@ class SearchAgent:
             self.logger.error(f"Error generating answer: {e}")
             return f"I encountered an error generating the answer: {str(e)}"
 
-    def search_and_answer(self, query: str) -> str:
-        """Main method to process a query and return an answer"""
+    def search_and_answer(self, query: str) -> Dict[str, Any]:
+        """Main method to process a query and return an answer with steps"""
+        steps = []
         attempt = 0
+        
+        # Step 1: Extract keywords
+        steps.append({
+            "action": "Keyword Extraction",
+            "description": "Extracting search keywords from the query..."
+        })
         keywords = self.extract_keywords(query)
+        steps[-1]["description"] = f"Extracted keywords: {', '.join(keywords)}"
         
         while attempt < self.max_search_attempts:
             self.logger.info(f"Search attempt {attempt + 1} with keywords: {keywords}")
             
             try:
-                # Search documents
+                # Step 2: Search documents
+                steps.append({
+                    "action": f"Document Search (Attempt {attempt + 1})",
+                    "description": f"Searching documents with keywords: {', '.join(keywords)}..."
+                })
                 results = self.indexer.search_documents(" ".join(keywords))
                 
-                # Evaluate results
+                if not results:
+                    steps[-1]["description"] = f"No documents found matching keywords: {', '.join(keywords)}"
+                    if attempt == self.max_search_attempts - 1:
+                        final_msg = "I couldn't find any relevant documents that match your query. Please try:\n" \
+                                  "1. Using different keywords\n" \
+                                  "2. Rephrasing your question\n" \
+                                  "3. Checking if the topic is covered in the indexed documents"
+                        return {
+                            "steps": steps,
+                            "answer": final_msg,
+                            "sources": []
+                        }
+                    # Try with next set of keywords
+                    attempt += 1
+                    if len(keywords) > 1:
+                        # Remove the first keyword and try with remaining ones
+                        keywords = keywords[1:]
+                    else:
+                        # If we're down to one keyword and still no results, stop searching
+                        final_msg = "No results found for your query. The topic might not be covered in the indexed documents."
+                        return {
+                            "steps": steps,
+                            "answer": final_msg,
+                            "sources": []
+                        }
+                    continue
+                
+                steps[-1]["description"] += f"\nFound {len(results)} results"
+                
+                # Step 3: Evaluate results
+                steps.append({
+                    "action": "Result Evaluation",
+                    "description": "Evaluating search results quality..."
+                })
                 is_good, new_keywords = self.evaluate_results(results, query)
                 
                 if is_good:
-                    # Generate and return answer
-                    return self.generate_answer(query, results)
+                    # Step 4: Generate answer
+                    steps.append({
+                        "action": "Answer Generation",
+                        "description": "Generating comprehensive answer from search results..."
+                    })
+                    answer = self.generate_answer(query, results)
+                    steps[-1]["description"] = "Generated answer based on found information"
+                    
+                    return {
+                        "steps": steps,
+                        "answer": answer,
+                        "sources": [{
+                            "title": result.get("title", "Untitled"),
+                            "path": result.get("path", "Unknown"),
+                            "highlights": result.get("highlights", []),
+                            "score": result.get("score", 0)
+                        } for result in results]
+                    }
                 
+                steps[-1]["description"] = "Results not satisfactory, refining search..."
                 if new_keywords:
                     keywords = new_keywords
                 else:
-                    # If no new keywords suggested, modify existing ones
                     keywords = keywords[1:] if len(keywords) > 1 else keywords
                 
                 attempt += 1
                 
             except Exception as e:
-                self.logger.error(f"Error during search attempt: {e}")
-                return f"An error occurred while processing your question: {str(e)}"
+                error_msg = f"An error occurred while processing your question: {str(e)}"
+                steps.append({
+                    "action": "Error",
+                    "description": error_msg
+                })
+                return {
+                    "steps": steps,
+                    "answer": error_msg,
+                    "sources": []
+                }
         
-        return "I couldn't find a satisfactory answer after multiple attempts. The available information might be insufficient. Please try rephrasing your question or check if the topic is covered in the documents."
+        final_msg = "I couldn't find a satisfactory answer after multiple attempts. The available information might be insufficient. Please try rephrasing your question or check if the topic is covered in the documents."
+        steps.append({
+            "action": "Search Exhausted",
+            "description": "Maximum search attempts reached without satisfactory results"
+        })
+        return {
+            "steps": steps,
+            "answer": final_msg,
+            "sources": []
+        }
