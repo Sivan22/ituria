@@ -15,9 +15,22 @@ class SearchAgentUI:
         self.search_field: Optional[ft.TextField] = None
         self.folder_display: Optional[ft.Text] = None
         self.results_column: Optional[ft.Column] = None
+        self.page: Optional[ft.Page] = None  # Store page reference
+
+    def clear_screen(self):
+        """Clear all results and reset status"""
+        if self.results_column:
+            self.results_column.controls = []
+        if self.status_text:
+            self.status_text.value = ""
+        if self.page:
+            self.page.update()
 
     def on_folder_picked(self, e: ft.FilePickerResultEvent):
         if e.path:
+            # Clear previous results
+            self.clear_screen()
+            
             self.selected_folder = e.path
             self.folder_display.value = f"Selected: {e.path}"
             self.status_text.value = "Initializing document indexer..."
@@ -53,6 +66,9 @@ class SearchAgentUI:
 
     async def on_search(self, e):
         if e.control.value:
+            # Clear previous results
+            self.clear_screen()
+            
             search_text = e.control.value
             # Clear previous results
             self.results_column.controls = []
@@ -317,6 +333,9 @@ class SearchAgentUI:
         e.page.update()
 
     def main(self, page: ft.Page):
+        # Store page reference
+        self.page = page
+        
         # Configure the page
         page.title = "Document Search Agent"
         page.theme_mode = ft.ThemeMode.LIGHT

@@ -21,20 +21,33 @@ class SearchAgent:
         self.max_search_attempts = 3
         self.min_confidence_threshold = 0.5
 
-    def extract_keywords(self, query: str) -> List[str]:
-        """Extract search keywords using Claude"""
+    def extract_keywords(self, query: str, failed_keywords: List[str] = None) -> List[str]:
+        """Extract search keywords using Claude, considering previously failed keywords"""
         try:
+            prompt = f"""Extract 3-5 most important search keywords from this question. 
+                    Consider synonyms and related terms that might help find relevant information.
+                    Return only the keywords separated by spaces, no other text.
+                    IMPORTANT: Do not split individual words into letters.
+                    """
+            
+            if failed_keywords:
+                prompt += f"""
+                    The following keywords were tried but found no results: {', '.join(failed_keywords)}
+                    Please suggest alternative keywords that are:
+                    1. Different from the failed keywords
+                    2. More general or using synonyms
+                    3. Related but from a different perspective
+                    """
+            
+            prompt += f"Question: {query}"
+            
             message = self.client.messages.create(
                 model="claude-3-opus-20240229",
                 max_tokens=100,
                 temperature=0,
                 messages=[{
                     "role": "user",
-                    "content": f"""Extract 3-5 most important search keywords from this question. 
-                    Consider synonyms and related terms that might help find relevant information.
-                    Return only the keywords separated by spaces, no other text.
-                    IMPORTANT: Do not split individual words into letters.
-                    Question: {query}"""
+                    "content": prompt
                 }]
             )
             keywords = message.content[0].text.strip().split()
@@ -45,7 +58,13 @@ class SearchAgent:
                             'to', 'was', 'were', 'will', 'with'}
                 words = [word.lower() for word in query.split() 
                         if word.lower() not in stop_words and len(word) > 1]
-                keywords = words[:5] if words else [query.lower()]  # Use full query if no valid words
+                keywords = words[:5] if words else [query.lower()]
+            
+            # Remove any keywords that were already tried
+            if failed_keywords:
+                keywords = [k for k in keywords if k.lower() not in {w.lower() for w in failed_keywords}]
+                if not keywords:  # If all new keywords were already tried
+                    keywords = [query.lower()]  # Use full query as fallback
             
             self.logger.info(f"Extracted keywords: {keywords}")
             return keywords
@@ -58,7 +77,7 @@ class SearchAgent:
                         'to', 'was', 'were', 'will', 'with'}
             words = [word.lower() for word in query.split() 
                     if word.lower() not in stop_words and len(word) > 1]
-            return words[:5] if words else [query.lower()]  # Use full query if no valid words
+            return words[:5] if words else [query.lower()]
 
     def evaluate_results(self, results: List[Dict[str, Any]], query: str) -> Tuple[bool, Optional[str]]:
         """Evaluate search results using Claude with confidence scoring"""
@@ -152,13 +171,14 @@ class SearchAgent:
         """Main method to process a query and return an answer with steps"""
         steps = []
         attempt = 0
+        failed_keywords = []
         
         # Step 1: Extract keywords
         steps.append({
             "action": "Keyword Extraction",
             "description": "Extracting search keywords from the query..."
         })
-        keywords = self.extract_keywords(query)
+        keywords = self.extract_keywords(query, failed_keywords)
         steps[-1]["description"] = f"Extracted keywords: {', '.join(keywords)}"
         
         while attempt < self.max_search_attempts:
@@ -174,6 +194,7 @@ class SearchAgent:
                 
                 if not results:
                     steps[-1]["description"] = f"No documents found matching keywords: {', '.join(keywords)}"
+                    failed_keywords.extend(keywords)
                     if attempt == self.max_search_attempts - 1:
                         final_msg = "I couldn't find any relevant documents that match your query. Please try:\n" \
                                   "1. Using different keywords\n" \
@@ -186,17 +207,7 @@ class SearchAgent:
                         }
                     # Try with next set of keywords
                     attempt += 1
-                    if len(keywords) > 1:
-                        # Remove the first keyword and try with remaining ones
-                        keywords = keywords[1:]
-                    else:
-                        # If we're down to one keyword and still no results, stop searching
-                        final_msg = "No results found for your query. The topic might not be covered in the indexed documents."
-                        return {
-                            "steps": steps,
-                            "answer": final_msg,
-                            "sources": []
-                        }
+                    keywords = self.extract_keywords(query, failed_keywords)
                     continue
                 
                 steps[-1]["description"] += f"\nFound {len(results)} results"
@@ -232,7 +243,8 @@ class SearchAgent:
                 if new_keywords:
                     keywords = new_keywords
                 else:
-                    keywords = keywords[1:] if len(keywords) > 1 else keywords
+                    failed_keywords.extend(keywords)
+                    keywords = self.extract_keywords(query, failed_keywords)
                 
                 attempt += 1
                 
