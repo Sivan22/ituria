@@ -128,7 +128,7 @@ class SearchAgent:
         except Exception as e:
             self.logger.error(f"Error evaluating results: {e}")
             # Fallback to simple evaluation
-            return len(results) >= 2, None
+            return len(results) >= 2, None , ""
 
     def generate_answer(self, query: str, results: List[Dict[str, Any]]) -> str:
         """Generate answer using Claude with improved context utilization"""
@@ -221,7 +221,7 @@ class SearchAgent:
                         "content": {
                             "title": result.get("filename", "Untitled"),
                             "score": f"{result.get('score', 0):.2f}",
-                            "highlights": result.get("highlights", [])[:1]  # Show first highlight only
+                            "highlights": result.get("highlights", [])  # Include all highlights
                         }
                     }
                     for result in results[:3]  # Show top 3 results

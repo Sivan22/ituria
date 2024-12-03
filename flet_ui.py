@@ -6,6 +6,7 @@ from typing import Optional
 import time
 from anthropic import RateLimitError  # Import RateLimitError from anthropic
 
+
 class SearchAgentUI:
     def __init__(self):
         self.indexer: Optional[DocumentIndexer] = None
@@ -16,6 +17,8 @@ class SearchAgentUI:
         self.folder_display: Optional[ft.Text] = None
         self.results_column: Optional[ft.Column] = None
         self.page: Optional[ft.Page] = None  # Store page reference
+        self.folder_button: Optional[ft.ElevatedButton] = None
+    
 
     def clear_screen(self):
         """Clear all results and reset status"""
@@ -26,6 +29,31 @@ class SearchAgentUI:
         if self.page:
             self.page.update()
 
+    def initialize_system(self):
+        """Initialize the indexer and agent at startup"""
+        try:
+            self.status_text.value = "Initializing document indexer..."
+            self.page.update()
+            
+            # Initialize indexer and agent
+            self.indexer = DocumentIndexer()
+            self.agent = SearchAgent(self.indexer)
+            
+            self.status_text.value = "Ready! Select a folder to index documents or start searching."
+            # Enable controls after initialization
+            self.folder_button.disabled = False          
+           
+            if self.search_field:
+                self.search_field.disabled = False
+            self.page.update()
+            
+        except ConnectionError:
+            self.status_text.value = "Error: Could not connect to Elasticsearch. Make sure it's running on localhost:9200"
+            self.page.update()
+        except Exception as ex:
+            self.status_text.value = f"Error initializing system: {str(ex)}"
+            self.page.update()
+
     def on_folder_picked(self, e: ft.FilePickerResultEvent):
         if e.path:
             # Clear previous results
@@ -33,38 +61,21 @@ class SearchAgentUI:
             
             self.selected_folder = e.path
             self.folder_display.value = f"Selected: {e.path}"
-            self.status_text.value = "Initializing document indexer..."
+            self.status_text.value = "Indexing documents..."
             e.page.update()
             
             try:
-                # Initialize indexer and agent
-                self.indexer = DocumentIndexer()
-                
-                self.status_text.value = "Indexing documents..."
+                num_docs = self.indexer.index_documents(e.path)
+                self.status_text.value = f"Ready to search! ({num_docs} documents indexed)"
                 e.page.update()
-                
-                try:
-                    num_docs = self.indexer.index_documents(e.path)
-                    self.agent = SearchAgent(self.indexer)
-                    
-                    self.status_text.value = f"Ready to search! ({num_docs} documents indexed)"
-                    self.search_field.disabled = False
-                    e.page.update()
-                except FileNotFoundError:
-                    self.status_text.value = "Error: Selected folder not found or inaccessible"
-                    e.page.update()
-                except Exception as ex:
-                    self.status_text.value = f"Error indexing documents: {str(ex)}"
-                    e.page.update()
-                    
-            except ConnectionError:
-                self.status_text.value = "Error: Could not connect to Elasticsearch. Make sure it's running on localhost:9200"
+            except FileNotFoundError:
+                self.status_text.value = "Error: Selected folder not found or inaccessible"
                 e.page.update()
             except Exception as ex:
-                self.status_text.value = f"Error initializing indexer: {str(ex)}"
+                self.status_text.value = f"Error indexing documents: {str(ex)}"
                 e.page.update()
 
-    async def on_search(self, e):
+    def on_search(self, e):
         if e.control.value:
             # Clear previous results
             self.clear_screen()
@@ -197,11 +208,12 @@ class SearchAgentUI:
                                         visible=not results['sources'],
                                         margin=ft.margin.only(top=20)
                                     )
-                                ])
+                                ]),
+                                padding=20,
+                                bgcolor=ft.colors.BLUE_50 if results['sources'] else ft.colors.ORANGE_50
                             )
                         ]),
-                        padding=20,
-                        bgcolor=ft.colors.BLUE_50 if results['sources'] else ft.colors.ORANGE_50
+                        padding=20
                     ),
                     margin=ft.margin.only(top=20, bottom=20)
                 )
@@ -348,6 +360,13 @@ class SearchAgentUI:
         
         e.page.update()
 
+    def toggle_highlights(self, e, highlights_container):
+        """Toggle visibility of highlights container and update button icon"""
+        highlights_container.visible = not highlights_container.visible
+        e.control.icon = ft.icons.EXPAND_LESS if highlights_container.visible else ft.icons.EXPAND_MORE
+        e.control.tooltip = "Hide highlights" if highlights_container.visible else "Show highlights"
+        e.page.update()
+
     def _create_results_view(self, results):
         """Create a visual representation of step results"""
         result_widgets = []
@@ -372,22 +391,46 @@ class SearchAgentUI:
                 )
             
             elif result['type'] == 'document':
-                # Display document result with title and highlight
+                # Display document result with title and expandable highlights
                 content = result['content']
+                
+                # Container for all highlights
+                highlights_container = ft.Container(
+                    content=ft.Column([
+                        ft.Text(
+                            highlight,
+                            size=11,
+                            color=ft.colors.GREY_800,
+                        ) for highlight in content['highlights']
+                    ]),
+                    visible=False,  # Initially hidden
+                )
+                
+                # Create expand button
+                expand_button = ft.IconButton(
+                    icon=ft.icons.EXPAND_MORE,
+                    icon_size=20,
+                    tooltip="Show highlights",
+                    on_click=lambda e, h=highlights_container: self.toggle_highlights(e, h)
+                )
+                
                 result_widgets.append(
                     ft.Container(
                         content=ft.Column([
-                            ft.Text(f"📄 {content['title']}", size=12, weight=ft.FontWeight.BOLD),
-                            ft.Text(f"Score: {content['score']}", size=11, color=ft.colors.GREY_700),
-                            *[ft.Text(
-                                highlight, 
-                                size=11, 
-                                color=ft.colors.GREY_800,
-                                max_lines=2,
-                                overflow=ft.TextOverflow.ELLIPSIS
-                            ) for highlight in content['highlights']]
+                            ft.Row([
+                                ft.Text(f"📄 {content['title']}", 
+                                       size=12, 
+                                       weight=ft.FontWeight.BOLD,
+                                       expand=True),
+                                ft.Text(f"Score: {content['score']}", 
+                                       size=11, 
+                                       color=ft.colors.GREY_700,
+                                       weight=ft.FontWeight.BOLD),
+                                expand_button,
+                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                            highlights_container,
                         ]),
-                        padding=ft.padding.all(5),
+                        padding=ft.padding.all(10),
                         border=ft.border.all(1, ft.colors.BLUE_100),
                         border_radius=5,
                         margin=ft.margin.only(bottom=5)
@@ -449,7 +492,7 @@ class SearchAgentUI:
 
         # Status text for indexing
         self.status_text = ft.Text(
-            value="Please select a folder to index",
+            value="Initializing system...",
             color=ft.colors.GREY_700,
             size=14
         )
@@ -463,10 +506,11 @@ class SearchAgentUI:
         def pick_folder_click(e):
             folder_picker.get_directory_path()
 
-        folder_button = ft.ElevatedButton(
+        self.folder_button = ft.ElevatedButton(
             "Select Folder",
             icon=ft.icons.FOLDER_OPEN,
-            on_click=pick_folder_click
+            on_click=pick_folder_click,
+            disabled=True  # Start disabled until initialization complete
         )
 
         self.folder_display = ft.Text(
@@ -476,19 +520,14 @@ class SearchAgentUI:
         )
 
         self.search_field = ft.TextField(
-            label="Ask a question",
-            hint_text="Enter your question here...",
-            width=600,
+            label="Enter your search query",
+            expand=True,
             on_submit=self.on_search,
-            disabled=True
+            disabled=True  # Start disabled until initialization complete
         )
 
-        search_button = ft.IconButton(
-            icon=ft.icons.SEARCH,
-            on_click=lambda e: self.on_search(ft.ControlEvent(self.search_field)),
-            disabled=False
-        )
-
+ 
+       
         # Results display
         self.results_column = ft.Column(
             scroll=ft.ScrollMode.AUTO,
@@ -498,16 +537,19 @@ class SearchAgentUI:
 
         # Layout
         page.add(
-            ft.Row([folder_button, self.folder_display], alignment=ft.MainAxisAlignment.START),
-            self.status_text,
-            ft.Divider(),
-            ft.Row(
-                [self.search_field, search_button],
-                alignment=ft.MainAxisAlignment.CENTER
-            ),
-            ft.Divider(),
-            self.results_column
+            ft.Column([
+                self.status_text,
+                ft.Row([
+                    self.folder_button,
+                    self.folder_display,
+                ]),
+                ft.Row([
+                    self.search_field,
+                ]),
+                self.results_column
+            ])
         )
+        self.initialize_system()
 
 if __name__ == "__main__":
     app = SearchAgentUI()
