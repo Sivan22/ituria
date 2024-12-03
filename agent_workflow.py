@@ -211,7 +211,16 @@ class SearchAgent:
                         }
                     # Try with next set of keywords
                     attempt += 1
+                    # add step: Extract keywords 
+                    steps.append({
+                        "action": "Keyword Extraction",
+                        "description": "Extracting search keywords from the query...",
+                        "results": []
+        })
                     keywords = self.extract_keywords(query, failed_keywords)
+                    
+                    steps[-1]["description"] = f"✓ Keywords extracted"
+                    steps[-1]["results"] = [{"type": "keywords", "content": keywords}]
                     continue
                 
                 steps[-1]["description"] = f"✓ Found {len(results)} documents"

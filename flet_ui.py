@@ -463,7 +463,7 @@ class SearchAgentUI:
                                 controls=[
                                     ft.Container(
                                         content=ft.Text(keyword, size=11),
-                                        bgcolor=ft.colors.ORANGE_50,
+                                        bgcolor=ft.colors.BLUE_50,
                                         padding=ft.padding.all(5),
                                         border_radius=15
                                     )
