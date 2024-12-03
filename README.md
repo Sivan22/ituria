@@ -1,5 +1,7 @@
 # AI Document Search Agent
 
+![alt text](image.png)
+
 ## Overview
 This project implements an intelligent document search and question-answering system that combines:
 - Elasticsearch for efficient document indexing and retrieval
