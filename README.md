@@ -42,36 +42,10 @@ docker run -d --name elasticsearch -p 9200:9200 -p 9300:9300 -e discovery.type=s
 ```
 
 ## Usage
-### Quick Start Demo
-Run the demo script to see the system in action with example questions about Israeli history and culture:
+### Quick Start
+Run the Flet UI to see the system in action with documents of your choice:
 ```bash
-python demo.py
-```
-The demo will:
-- Index sample documents from the `documents` directory
-- Process a set of predefined questions in Hebrew
-- Display search results and generated answers
-- Demonstrate error handling and logging
-
-### Indexing Documents
-```python
-from document_indexer import DocumentIndexer
-
-indexer = DocumentIndexer()
-indexed_count = indexer.index_documents('./documents')
-print(f"Indexed {indexed_count} documents")
-```
-
-### Searching and Answering Questions
-```python
-from document_indexer import DocumentIndexer
-from agent_workflow import SearchAgent
-
-indexer = DocumentIndexer()
-agent = SearchAgent(indexer)
-query = "What are the key principles of machine learning?"
-answer = agent.search_and_answer(query)
-print(answer)
+python flet_ui.py
 ```
 
 ## How It Works
@@ -100,6 +74,7 @@ print(answer)
   - Claude-3 parameters
   - Answer generation requirements
 - Customize `demo.py` to test with different questions or document sets
+- Customize `flet_ui' to fit the UX/UI to your needs
 
 ## Security
 - Store API keys and sensitive data in environment variables
