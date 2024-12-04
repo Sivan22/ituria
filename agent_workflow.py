@@ -26,8 +26,8 @@ class SearchAgent:
         try:
             prompt = f"""Extract 3-5 most important search keywords from this question. 
                     Consider synonyms and related terms that might help find relevant information.
+                    Use ancient Hebrew terms and/or Talmudic expressions if possible.
                     Return only the keywords separated by spaces, no other text.
-                    IMPORTANT: Do not split individual words into letters.
                     """
             
             if failed_keywords:
@@ -81,9 +81,7 @@ class SearchAgent:
 
     def evaluate_results(self, results: List[Dict[str, Any]], query: str) -> Tuple[bool, Optional[str], Optional[str]]:
         """Evaluate search results using Claude with confidence scoring"""
-        if not results:
-            return False, "No results found"
-
+     
         # Prepare context from results
         context = "\n".join(
             f"Result {i+1}:\n" + "\n".join(r.get('highlights', []))
@@ -105,7 +103,7 @@ class SearchAgent:
                     
                     Provide evaluation in this format:
                     Line 1: Confidence score (0.0 to 1.0) indicating how well the results can answer the question
-                    Line 2: ACCEPT if score >= 0.5, REFINE if score < 0.5
+                    Line 2: ACCEPT if score >= {self.min_confidence_threshold}, REFINE if score < {self.min_confidence_threshold}
                     Line 3: Detailed explanation of what information is present or missing
                     Line 4: If REFINE, suggest better search keywords (space-separated), considering missing aspects
                     """
@@ -158,6 +156,7 @@ class SearchAgent:
                     2. Be comprehensive but concise
                     3. Structure the answer clearly
                     4. If any aspect of the question cannot be fully answered, acknowledge this
+                    5. cite sources for each fact or information you use
                     """
                 }]
             )

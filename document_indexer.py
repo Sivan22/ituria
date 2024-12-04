@@ -166,8 +166,8 @@ class DocumentIndexer:
                 'highlight': {
                     'fields': {
                         'content': {
-                            'fragment_size': 150,
-                            'number_of_fragments': 3,
+                            'fragment_size': 300,
+                            'number_of_fragments': 30,
                             'pre_tags': [''],
                             'post_tags': ['']
                         }

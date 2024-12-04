@@ -4,7 +4,6 @@ from agent_workflow import SearchAgent
 import os
 from typing import Optional
 import time
-from anthropic import RateLimitError  # Import RateLimitError from anthropic
 
 
 class SearchAgentUI:
@@ -18,8 +17,112 @@ class SearchAgentUI:
         self.results_column: Optional[ft.Column] = None
         self.page: Optional[ft.Page] = None  # Store page reference
         self.folder_button: Optional[ft.ElevatedButton] = None
-    
 
+    def main(self, page: ft.Page):
+        # Store page reference
+        self.page = page
+        
+        # Configure the page
+        page.title = "Document Search Agent"
+        page.theme_mode = ft.ThemeMode.LIGHT
+        page.window_width = 1000
+        page.window_height = 800
+        page.window_resizable = True
+
+        # Status text for indexing
+        self.status_text = ft.Text(
+            value="Initializing system...",
+            color=ft.colors.GREY_700,
+            size=16,
+            weight=ft.FontWeight.W_500
+        )
+
+        # Directory picker
+        folder_picker = ft.FilePicker(
+            on_result=self.on_folder_picked
+        )
+        page.overlay.append(folder_picker)
+
+        def pick_folder_click(e):
+            folder_picker.get_directory_path()
+
+        self.folder_button = ft.ElevatedButton(
+            "Select Folder",
+            icon=ft.icons.FOLDER_OPEN,
+            on_click=pick_folder_click,
+            disabled=True,
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=8),
+                padding=20
+            )
+        )
+
+        self.folder_display = ft.Text(
+            value="No folder selected",
+            color=ft.colors.GREY_700,
+            size=14,
+            weight=ft.FontWeight.W_400
+        )
+
+        self.search_field = ft.TextField(
+            label="Enter your search query",
+            expand=True,
+            on_submit=self.on_search,
+            disabled=True,
+            border_radius=8,
+            filled=True,
+            prefix_icon=ft.icons.SEARCH,
+            hint_text="Type your question here..."
+        )
+ 
+        # Results display
+        self.results_column = ft.Column(
+            scroll=ft.ScrollMode.AUTO,
+            spacing=10,
+            height=500
+        )
+
+        # Layout with Container and Card
+        page.add(
+            ft.Container(
+                content=ft.Card(
+                    content=ft.Container(
+                        content=ft.Column([
+                            ft.Container(
+                                content=self.status_text,
+                                margin=ft.margin.only(bottom=20)
+                            ),
+                            ft.Container(
+                                content=ft.Row(
+                                    [
+                                        self.folder_button,
+                                        ft.Container(width=10),
+                                        self.folder_display,
+                                    ],
+                                    alignment=ft.MainAxisAlignment.START
+                                ),
+                                margin=ft.margin.only(bottom=20)
+                            ),
+                            ft.Container(
+                                content=self.search_field,
+                                margin=ft.margin.only(bottom=20)
+                            ),
+                            ft.Container(
+                                content=self.results_column,
+                                border=ft.border.all(1, ft.colors.GREY_300),
+                                border_radius=8,
+                                padding=10
+                            )
+                        ]),
+                        padding=30
+                    ),
+                    elevation=3
+                ),
+                margin=ft.margin.only(top=20)
+            )
+        )
+        self.initialize_system()
+        
     def clear_screen(self):
         """Clear all results and reset status"""
         if self.results_column:
@@ -418,7 +521,7 @@ class SearchAgentUI:
                     ft.Container(
                         content=ft.Column([
                             ft.Row([
-                                ft.Text(f"📄 {content['title']}", 
+                                ft.Text(f" {content['title']}", 
                                        size=12, 
                                        weight=ft.FontWeight.BOLD,
                                        expand=True),
@@ -478,78 +581,7 @@ class SearchAgentUI:
         
         return ft.Column(controls=result_widgets, spacing=5)
 
-    def main(self, page: ft.Page):
-        # Store page reference
-        self.page = page
-        
-        # Configure the page
-        page.title = "Document Search Agent"
-        page.theme_mode = ft.ThemeMode.LIGHT
-        page.padding = 20
-        page.window_width = 1000
-        page.window_height = 800
-        page.window_resizable = True
 
-        # Status text for indexing
-        self.status_text = ft.Text(
-            value="Initializing system...",
-            color=ft.colors.GREY_700,
-            size=14
-        )
-
-        # Directory picker
-        folder_picker = ft.FilePicker(
-            on_result=self.on_folder_picked
-        )
-        page.overlay.append(folder_picker)
-
-        def pick_folder_click(e):
-            folder_picker.get_directory_path()
-
-        self.folder_button = ft.ElevatedButton(
-            "Select Folder",
-            icon=ft.icons.FOLDER_OPEN,
-            on_click=pick_folder_click,
-            disabled=True  # Start disabled until initialization complete
-        )
-
-        self.folder_display = ft.Text(
-            value="No folder selected",
-            color=ft.colors.GREY_700,
-            size=14
-        )
-
-        self.search_field = ft.TextField(
-            label="Enter your search query",
-            expand=True,
-            on_submit=self.on_search,
-            disabled=True  # Start disabled until initialization complete
-        )
-
- 
-       
-        # Results display
-        self.results_column = ft.Column(
-            scroll=ft.ScrollMode.AUTO,
-            spacing=10,
-            height=500
-        )
-
-        # Layout
-        page.add(
-            ft.Column([
-                self.status_text,
-                ft.Row([
-                    self.folder_button,
-                    self.folder_display,
-                ]),
-                ft.Row([
-                    self.search_field,
-                ]),
-                self.results_column
-            ])
-        )
-        self.initialize_system()
 
 if __name__ == "__main__":
     app = SearchAgentUI()
