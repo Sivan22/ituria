@@ -25,34 +25,35 @@ class SearchAgentUI:
         self.page = page
         
         # Configure the page
-        page.title = "Document Search Agent"
+        page.title = "סוכן חיפוש מסמכים"
         page.theme_mode = ft.ThemeMode.LIGHT
         page.window_width = 1000
         page.window_height = 800
         page.window_resizable = True
+        page.rtl = True  # Set RTL direction for the entire page
 
         # the max number of iterations
         self.max_iterations = ft.TextField(
-            label="Max iterations",
+            label="מספר נסיונות מקסימלי",
             value="3",
             width=150,
-            text_align=ft.TextAlign.RIGHT,
+            text_align=ft.TextAlign.LEFT,  # In RTL, LEFT alignment will appear on the right
             keyboard_type=ft.KeyboardType.NUMBER,
         )
 
         # the number of results per search
         self.results_per_search = ft.TextField(
-            label="Results per search",
+            label="תוצאות לכל חיפוש",
             value="5",
             width=150,
-            text_align=ft.TextAlign.RIGHT,
+            text_align=ft.TextAlign.LEFT,  # In RTL, LEFT alignment will appear on the right
             keyboard_type=ft.KeyboardType.NUMBER,
         )
 
   
         # Status text for indexing
         self.status_text = ft.Text(
-            value="Please select a Tantivy index folder to begin searching",
+            value="אנא בחר תיקיית אינדקס כדי להתחיל בחיפוש",
             color=ft.colors.GREY_700,
             size=16,
             weight=ft.FontWeight.W_500
@@ -68,7 +69,7 @@ class SearchAgentUI:
             folder_picker.get_directory_path()
 
         self.folder_button = ft.ElevatedButton(
-            "Select Index Folder",
+            "בחר תיקיית אינדקס",
             icon=ft.icons.FOLDER_OPEN,
             on_click=pick_folder_click,
             disabled=False,  # Enable immediately since we need folder selection first
@@ -79,21 +80,22 @@ class SearchAgentUI:
         )
 
         self.folder_display = ft.Text(
-            value="No index folder selected",
+            value="לא נבחרה תיקיית אינדקס",
             color=ft.colors.GREY_700,
             size=14,
             weight=ft.FontWeight.W_400
         )
 
         self.search_field = ft.TextField(
-            label="Enter your search query",
+            label="הכנס שאילתת חיפוש",
             expand=True,
             on_submit=self.on_search,
-            disabled=True,  # Disabled until index is loaded
+            disabled=True,
             border_radius=8,
             filled=True,
             prefix_icon=ft.icons.SEARCH,
-            hint_text="Type your search query here..."
+            hint_text="הקלד את שאילתת החיפוש שלך כאן...",
+            text_align=ft.TextAlign.RIGHT,
         )
  
         # Results display
@@ -117,14 +119,14 @@ class SearchAgentUI:
                             ft.Container(
                                 content=ft.Row(
                                     [
-                                        self.folder_button,
-                                        ft.Container(width=10),                                        
-                                        self.folder_display,                                     
-                                        ft.Container(expand=True),                                                                           
+                                         self.folder_button,
+                                         ft.Container(width=10),
+                                          self.folder_display,
+                                            ft.Container(expand=True),
+                                        self.max_iterations,
                                         self.results_per_search,
-                                        self.max_iterations
                                     ],
-                                    alignment=ft.MainAxisAlignment.START
+                                    alignment=ft.MainAxisAlignment.END
                                 ),
                                 margin=ft.margin.only(bottom=20)
                             ),
@@ -159,26 +161,26 @@ class SearchAgentUI:
     def on_folder_picked(self, e: ft.FilePickerResultEvent):
         if e.path:
             self.selected_folder = e.path
-            self.folder_display.value = f"Selected index: {os.path.basename(e.path)}"
+            self.folder_display.value = f"אינדקס נבחר: {os.path.basename(e.path)}"
             try:
                 # Initialize both Tantivy agent and search agent
                 self.tantivy_agent = TantivySearchAgent(e.path)
                 if self.tantivy_agent.validate_index():
                     # Create search agent with Tantivy agent
                     self.agent = SearchAgent(self.tantivy_agent)
-                    self.status_text.value = "Index loaded successfully! Ready to search."
+                    self.status_text.value = "האינדקס נטען בהצלחה! מוכן לחיפוש."
                     self.status_text.color = ft.colors.GREEN
                     self.search_field.disabled = False
                 else:
-                    self.status_text.value = "Invalid Tantivy index folder. Please select a valid index."
+                    self.status_text.value = "תיקיית אינדקס לא תקינה. אנא בחר אינדקס תקין."
                     self.status_text.color = ft.colors.RED
                     self.search_field.disabled = True
             except Exception as ex:
-                self.status_text.value = f"Error loading index: {str(ex)}"
+                self.status_text.value = f"שגיאה בטעינת האינדקס: {str(ex)}"
                 self.status_text.color = ft.colors.RED
                 self.search_field.disabled = True
         else:
-            self.status_text.value = "No folder selected"
+            self.status_text.value = "לא נבחרה תיקייה"
             self.status_text.color = ft.colors.GREY_700
             self.search_field.disabled = True
             
@@ -186,7 +188,7 @@ class SearchAgentUI:
 
     def on_search(self, e):
         if not self.agent or not self.tantivy_agent:
-            self.status_text.value = "Please select a valid index folder first"
+            self.status_text.value = "אנא בחר תיקיית אינדקס תקינה תחילה"
             self.status_text.color = ft.colors.RED
             self.page.update()
             return
@@ -195,7 +197,7 @@ class SearchAgentUI:
         if not query:
             return
 
-        self.status_text.value = "Searching..."
+        self.status_text.value = "מחפש..."
         self.status_text.color = ft.colors.BLUE
         self.page.update()
 
@@ -212,7 +214,7 @@ class SearchAgentUI:
                 content=ft.Column(
                     controls=[
                         ft.Text(
-                            "Search Process Steps",
+                            "צעדי תהליך החיפוש",
                             size=20,
                             weight=ft.FontWeight.BOLD,
                             color=ft.colors.BLUE_700
@@ -242,12 +244,17 @@ class SearchAgentUI:
                                 ),
                                 ft.Container(
                                     bgcolor=ft.colors.BLUE_200,
-                                    width=2,
-                                    height=40,
+                                    width=2, 
+                                    height=30,                                 
                                     visible=i < len(search_results['steps']) - 1
-                                )
+                                ),
+                                ft.Container(expand=True)                          
+
                             ]),
-                            padding=ft.padding.only(right=20)
+                            padding=ft.padding.only(right=20),
+                            alignment=ft.alignment.top_center
+
+                            
                         ),
                         # Step content
                         ft.Container(
@@ -278,7 +285,7 @@ class SearchAgentUI:
                 content=ft.Container(
                     content=ft.Column([
                         ft.Text(
-                            "Final Answer",
+                            "תשובה סופית",
                             weight=ft.FontWeight.BOLD,
                             size=20,
                             color=ft.colors.BLUE_700
@@ -305,7 +312,7 @@ class SearchAgentUI:
                 sources_container = ft.Container(
                     content=ft.Column([
                         ft.Text(
-                            "Source Documents",
+                            "מסמכי מקור",
                             size=20,
                             weight=ft.FontWeight.BOLD,
                             color=ft.colors.BLUE_700
@@ -327,7 +334,7 @@ class SearchAgentUI:
                                     color=ft.colors.BLUE_700
                                 ),
                                 ft.Text(
-                                    f"Score: {source['score']:.2f}",
+                                    f"ציון: {source['score']:.2f}",
                                     size=14,
                                     color=ft.colors.GREY_700
                                 ),
@@ -357,15 +364,15 @@ class SearchAgentUI:
                     )
                     sources_container.content.controls.append(source_card)
 
-            self.status_text.value = "Search completed!"
+            self.status_text.value = "חיפוש הושלם!"
             self.status_text.color = ft.colors.GREEN
             
         except Exception as ex:
-            self.status_text.value = f"Search error: {str(ex)}"
+            self.status_text.value = f"שגיאת חיפוש: {str(ex)}"
             self.status_text.color = ft.colors.RED
             self.results_column.controls.clear()
             self.results_column.controls.append(
-                ft.Text(f"Error performing search: {str(ex)}", 
+                ft.Text(f"שגיאה בביצוע חיפוש: {str(ex)}", 
                        size=16, 
                        color=ft.colors.RED)
             )
@@ -384,9 +391,10 @@ class SearchAgentUI:
                 # Display keywords as chips
                 result_widgets.append(
                     ft.Text(
-                        f"Generated query: {result['content']}",
+                        f"שאילתת חיפוש נוצרה: {result['content']}",
                         size=12,
-                        color=ft.colors.GREY_700
+                        color=ft.colors.GREY_700,
+                        text_align=ft.TextAlign.RIGHT,
                     )
                 )
                 
@@ -404,10 +412,11 @@ class SearchAgentUI:
                                     expand=True
                                 ),
                                 ft.Text(
-                                    f"Score: {content['score']:.2f}",
+                                    f"ציון: {content['score']:.2f}",
                                     size=11,
                                     color=ft.colors.GREY_700,
-                                    weight=ft.FontWeight.BOLD
+                                    weight=ft.FontWeight.BOLD,
+                                    text_align=ft.TextAlign.RIGHT,
                                 ),
                             ]),
                             ft.Container(
@@ -440,9 +449,10 @@ class SearchAgentUI:
                     ft.Row([
                         ft.Icon(icon, color=color, size=16),
                         ft.Text(
-                            f"Confidence: {content['confidence']}",
+                            f"ביטחון: {content['confidence']}",
                             color=color,
-                            size=12
+                            size=12,
+                            text_align=ft.TextAlign.RIGHT,
                         )]))
                 if content['explanation']:
                     result_widgets.append(
@@ -455,20 +465,22 @@ class SearchAgentUI:
                 if content['new_query']:
                     result_widgets.append(
                         ft.Text(
-                            f"New query: {content['new_query']}",
+                            f"שאילתת חיפוש חדשה: {content['new_query']}",
                             size=11,
-                            color=ft.colors.GREY_700
+                            color=ft.colors.GREY_700,
+                            text_align=ft.TextAlign.RIGHT,
                         )
                     )
             
-            elif result['type'] == 'next_query':
+            elif result['type'] == 'new_query':
                 # Display next keywords to try
                 result_widgets.append(
                     ft.Container(
                         content=ft.Column([
-                            ft.Text(f"Trying next: {result['content']}", size=11, color=ft.colors.GREY_700),
-                         
-                           
+                            ft.Text(f"ניסיון הבא: {result['content']}", 
+                                   size=11, 
+                                   color=ft.colors.GREY_700,
+                                   text_align=ft.TextAlign.RIGHT),
                         ])
                     )
                 )

@@ -1,93 +1,93 @@
-# AI Document Search Agent
+# סוכן חיפוש מסמכים מבוסס בינה מלאכותית
 
 ![alt text](image.png)
 
-## Overview
-This project implements an intelligent document search and question-answering system that combines:
-- Tantivy for efficient document indexing and retrieval
-- Anthropic's Claude-3 for keyword extraction, result evaluation, and answer generation
-- Custom search refinement workflow for improved answer accuracy
+## סקירה כללית
+פרויקט זה מיישם מערכת חיפוש ושאלות-תשובות חכמה המשלבת:
+- Tantivy לאינדוקס ואחזור מסמכים יעיל
+- Claude-3 של Anthropic לחילוץ מילות מפתח, הערכת תוצאות ויצירת תשובות
+- תהליך עבודה מותאם אישית לשיפור דיוק התשובות
 
-## Features
-- Smart document indexing with Tantivy for improved search relevance
-- Intelligent keyword extraction from natural language questions
-- Automated search result evaluation and refinement
-- Multi-attempt search strategy with confidence scoring
-- Context-aware answer generation using Claude-3
-- Comprehensive error handling and logging
-- Support for multilingual queries and documents
-- Configurable search parameters (max iterations, results per search)
+## תכונות
+- אינדוקס מסמכים חכם עם Tantivy לשיפור רלוונטיות החיפוש
+- חילוץ חכם של מילות מפתח משאלות בשפה טבעית
+- הערכה ושיפור אוטומטיים של תוצאות החיפוש
+- אסטרטגיית חיפוש מרובת ניסיונות עם ציוני ביטחון
+- יצירת תשובות מודעת הקשר באמצעות Claude-3
+- טיפול מקיף בשגיאות ותיעוד
+- תמיכה בשאילתות ומסמכים רב-לשוניים
+- פרמטרים מותאמים אישית לחיפוש (מספר איטרציות מקסימלי, תוצאות לחיפוש)
 
-## Prerequisites
-- Python 3.11+
-- Tantivy index from the otzaria app
-- Anthropic API Key (Claude-3 access required)
+## דרישות מוקדמות
+- Python 3.11 ומעלה
+- אינדקס Tantivy מאפליקציית אוצריה
+- מפתח API של Anthropic (נדרשת גישה ל-Claude-3)
 
-## Installation
-1. Clone the repository
-2. Install dependencies:
+## התקנה
+1. שכפל את המאגר
+2. התקן את התלויות:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Set up `.env` file with your credentials:
+3. הגדר קובץ `.env` עם האישורים שלך:
 ```
 ANTHROPIC_API_KEY=your_anthropic_api_key
 ```
 
-## Usage
-### Quick Start
-Run the Flet UI to see the system in action:
+## שימוש
+### התחלה מהירה
+הפעל את ממשק המשתמש של Flet כדי לראות את המערכת בפעולה:
 
 ```bash
 python flet_ui.py
 ```
 
-The UI allows you to:
-- Select a Tantivy index folder
-- Configure max iterations per search
-- Set number of results per search
-- View detailed search process steps
-- See highlighted search results
+ממשק המשתמש מאפשר לך:
+- לבחור תיקיית אינדקס Tantivy
+- להגדיר מספר איטרציות מקסימלי לחיפוש
+- לקבוע מספר תוצאות לחיפוש
+- לצפות בשלבי תהליך החיפוש המפורטים
+- לראות תוצאות חיפוש מודגשות
 
-## How It Works
+## איך זה עובד
 
-### Document Indexing
-- Documents are pre-indexed using Tantivy through the otzaria app
-- Tantivy provides efficient and accurate document indexing
+### אינדוקס מסמכים
+- המסמכים מאונדקסים מראש באמצעות Tantivy דרך אפליקציית אוצריה
+- Tantivy מספק אינדוקס מסמכים יעיל ומדויק
 
-### Search and Answer Generation
-1. **Keyword Extraction**: Uses Claude-3 to extract relevant search keywords from the question
-2. **Document Search**: Performs Tantivy search with extracted keywords
-3. **Result Evaluation**: 
-   - Evaluates search results using Claude-3
-   - Assigns confidence scores to determine result quality
-   - Automatically refines search if confidence is low
-4. **Answer Generation**: 
-   - Generates comprehensive answers using relevant document contexts
-   - Structures responses clearly and acknowledges any information gaps
+### חיפוש ויצירת תשובות
+1. **חילוץ מילות מפתח**: משתמש ב-Claude-3 לחילוץ מילות מפתח רלוונטיות מהשאלה
+2. **חיפוש מסמכים**: מבצע חיפוש Tantivy עם מילות המפתח שחולצו
+3. **הערכת תוצאות**: 
+   - מעריך תוצאות חיפוש באמצעות Claude-3
+   - מעניק ציוני ביטחון לקביעת איכות התוצאות
+   - משפר אוטומטית את החיפוש אם הביטחון נמוך
+4. **יצירת תשובות**: 
+   - מייצר תשובות מקיפות באמצעות הקשרי מסמכים רלוונטיים
+   - מבנה תשובות בצורה ברורה ומציין פערי מידע
 
-## Configuration
-- Modify `tantivy_search_agent.py` to customize Tantivy settings and analysis
-- Adjust `agent_workflow.py` to configure:
-  - Confidence thresholds
-  - Claude-3 parameters
-  - Answer generation requirements
-- Customize `flet_ui` to fit the UX/UI to your needs
+## הגדרות
+- שנה את `tantivy_search_agent.py` כדי להתאים אישית הגדרות וניתוח Tantivy
+- התאם את `agent_workflow.py` כדי להגדיר:
+  - ספי ביטחון
+  - פרמטרים של Claude-3
+  - דרישות יצירת תשובות
+- התאם אישית את `flet_ui` כדי להתאים את חוויית/ממשק המשתמש לצרכיך
 
-## Security
-- Store API keys and sensitive data in environment variables
-- Never commit `.env` file to version control
-- Ensure proper access controls on Tantivy index
+## אבטחה
+- אחסן מפתחות API ונתונים רגישים במשתני סביבה
+- לעולם אל תעלה קובץ `.env` לבקרת גרסאות
+- ודא בקרות גישה נאותות לאינדקס Tantivy
 
-## Troubleshooting
-- Verify Tantivy index exists and accessible
-- Check Anthropic API key permissions and Claude-3 access
-- Ensure proper file permissions for document directory
-- Review logs for detailed error information
+## פתרון בעיות
+- ודא שאינדקס Tantivy קיים ונגיש
+- בדוק הרשאות מפתח API של Anthropic וגישה ל-Claude-3
+- ודא הרשאות קבצים מתאימות לספריית המסמכים
+- עיין ביומנים למידע מפורט על שגיאות
 
-## Contributing
-Contributions are welcome! Please submit pull requests or open issues for bugs and feature requests.
+## תרומה
+תרומות מתקבלות בברכה! אנא שלח בקשות משיכה או פתח סוגיות עבור באגים ובקשות תכונות.
 
-## License
+## רישיון
 MIT

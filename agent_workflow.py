@@ -20,7 +20,7 @@ class SearchAgent:
 
         self.min_confidence_threshold = 0.5
 
-    def get_query(self, query: str, failed_keywords: List[str] = None) -> str:
+    def get_query(self, query: str, failed_queries: List[str] = None) -> str:
         """Generate a Tantivy syntax query using Claude, considering previously failed queries"""
         try:
             prompt = (
@@ -34,10 +34,11 @@ class SearchAgent:
                 f"the search request: {query}"
             )
             
-            if failed_keywords:
+            if failed_queries:
                 prompt += (
-                    f"\n\nThe following queries failed to find results:\n"
-                    f"{', '.join(failed_keywords)}\n\n"
+                    f"\n\nהשאילתות הבאות לא מצאו תוצאות:\n"+
+                    '\n'.join(failed_queries)+
+                    "\n\n"
                     "Please generate an alternative query that:\n"
                     "1. Uses different Hebrew synonyms or related terms\n"
                     "2. Tries broader or more general terms\n"
@@ -68,11 +69,10 @@ class SearchAgent:
     def _evaluate_results(self, results: List[Dict[str, Any]], query: str) -> Dict[str, Any]:
         """Evaluate search results using Claude with confidence scoring"""
      
-        # Prepare context from results
-        context = "\n".join(
-            f"Result {i+1}:\n Source: {r.get('title',[])}\n Text: {r.get('text', [])[:300]}\n"
+       # Prepare context from results
+        context = "\n".join(f"Result {i}. Source: {r.get('title',[])}\n Text: {r.get('text', [])}"
             for i, r in enumerate(results)
-        )
+                )
 
         try:
             message = self.client.messages.create(
@@ -88,10 +88,18 @@ class SearchAgent:
                     {context}
                     
                     Provide evaluation in this format:
-                    [line 1] Confidence score (0.0 to 1.0) indicating how well the results can answer the question. this line should include only the number return
+                    [line 1] Confidence score (0.0 to 1.0) indicating how well the results can answer the question. this line should include only the number return, don't include '[line 1]'
                     [line 2] ACCEPT if score >= {self.min_confidence_threshold}, REFINE if score < {self.min_confidence_threshold}. return only the word ACCEPT or REFINE.
-                    [line 3] Detailed explanation of what information is present or missing, don't include '[line 3]'.
+                    [line 3] Detailed explanation of what information is present or missing, don't include '[line 3]'. it should be only in Hebrew
                     [line 4] If REFINE, suggest a better Tantivy query using Hebrew terms, considering missing aspects. return only the Tantivy query
+
+                    following is the rules for creating a Tantivy query:
+                    {self.tantivy_agent.get_query_instructions()}
+                      "\n\nAdditional instructions for the new query: \n"
+                "1. Use only Hebrew terms for the search query\n"
+                "2. the corpus to search in is an ancient Hebrew corpus - Tora and Talmud. "
+                "3. Try to use ancient Hebrew terms and or Talmudic expressions and prevent modern words that are not common in those texts \n"      
+                    
                     """
                 }]
             )
@@ -111,7 +119,7 @@ class SearchAgent:
                 "confidence": confidence,
                 "is_sufficient": is_good,
                 "explanation": explanation,
-                "new_query": [new_query] if new_query else None
+                "new_query":new_query
             }
             
         except Exception as e:
@@ -130,7 +138,7 @@ class SearchAgent:
             return "I couldn't find any relevant information to answer your question."
 
           # Prepare context from results
-        context = "\n".join(f"Source: {r.get('title',[])}\n" + "\n".join(r.get('text', [])[:300])
+        context = "\n".join(f"Result {i}. Source: {r.get('title',[])}\n Text: {r.get('text', [])}"
             for i, r in enumerate(results)
                 )
         
@@ -171,8 +179,8 @@ class SearchAgent:
         # Step 1: Generate Tantivy query
         initial_query = self.get_query(query)
         steps.append({
-            'action': 'Query Generation',
-            'description': 'Generated initial Tantivy query',
+            'action': 'יצירת שאילתת חיפוש',
+            'description': 'נוצרה שאילתת חיפוש עבור מנוע החיפוש',
             'results': [{'type': 'query', 'content': initial_query}]
         })
         
@@ -180,8 +188,8 @@ class SearchAgent:
         results = self.tantivy_agent.search(initial_query, num_results)
         
         steps.append({
-            'action': 'Initial Search',
-            'description': f'Searching with query: {initial_query}',
+            'action': 'חיפוש במאגר',
+            'description': f'חיפוש במאגר עבור שאילתת חיפוש: {initial_query}\n נמצאו {len(results)} תוצאות',
             'results': [{'type': 'document', 'content': {
                 'title': r['title'],
                 'highlights': [r['highlights'][0]],
@@ -200,8 +208,8 @@ class SearchAgent:
         
         
         steps.append({
-            'action': 'Result Evaluation',
-            'description': 'Evaluating search results quality',
+            'action': 'דירוג תוצאות',
+            'description': 'דירוג תוצאות חיפוש',
             'results': [{
                 'type': 'evaluation',
                 'content': {
@@ -218,24 +226,24 @@ class SearchAgent:
         failed_queries = [initial_query]
         
         while not is_sufficient and attempt < max_iterations:
-            # Generate new Tageququeryluding previously failed ones
-            new_query = self.get_query(query, failed_queries)
-            failed_queries.append(new_query)
-            
-            steps.append({
-                'action': f'Additional Query (Attempt {attempt})',
-                'description': 'Generated alternative Tantivy query',
-                'results': [
-                    {'type': 'next_query', 'content': new_query}
-                ]
-            })
+            # Generate new query
+            if not new_query:
+                new_query = self.get_query(query, failed_queries)
+           
+                steps.append({
+                    'action': f'יצירת שאילתה מחדש (ניסיון {attempt+1})',
+                    'description': 'נוצרה שאילתת חיפוש נוספת עבור מנוע החיפוש',
+                    'results': [
+                        {'type': 'new_query', 'content': new_query}
+                    ]
+                })
             
             # Search with new query
             results = self.tantivy_agent.search(new_query, num_results)
             
             steps.append({
-                'action': f'Additional Search (Attempt {attempt})',
-                'description': f'Searching with query: {new_query}',
+                'action': f'חיפוש נוסף (ניסיון {attempt+1}) ',
+                'description': f'מחפש במאגר עבור שאילתת חיפוש: {new_query}',
                 'results': [{'type': 'document', 'content': {
                     'title': r['title'],
                     'highlights': [r['highlights']],
@@ -245,16 +253,19 @@ class SearchAgent:
             
             all_results.extend(results)
             
-            # Re-evaluate with all results
-            evaluation = self._evaluate_results(all_results, query)
+            # Re-evaluate with current results
+            evaluation = self._evaluate_results(results, query)
             confidence = evaluation['confidence']
             is_sufficient = evaluation['is_sufficient']
             explanation = evaluation['explanation']
             new_query = evaluation['new_query']
+
+            if not is_sufficient:
+                failed_queries.append(query)
             
             steps.append({
-                'action': f'Result Evaluation (Attempt {attempt})',
-                'description': 'Evaluating combined search results',
+                'action': f'דירוג תוצאות (ניסיון {attempt+1})',
+                'description': 'דירוג תוצאות חיפוש לניסיון זה',
                 'explanation': explanation,
                 'results': [{
                     'type': 'evaluation',
