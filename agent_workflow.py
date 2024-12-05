@@ -2,26 +2,35 @@ import os
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
-import anthropic
+from llm_providers import LLMProvider
+from langchain.schema import HumanMessage
 from tantivy_search_agent import TantivySearchAgent
 
 load_dotenv()
 
 class SearchAgent:
-    def __init__(self, tantivy_agent: TantivySearchAgent):
+    def __init__(self, tantivy_agent: TantivySearchAgent, provider_name: str = "anthropic"):
         """Initialize the search agent with Tantivy agent and LLM client"""
         self.tantivy_agent = tantivy_agent
         self.logger = logging.getLogger(__name__)
         
-        api_key = os.getenv('ANTHROPIC_API_KEY')
-        if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
-        self.client = anthropic.Client(api_key=api_key)
-
+        # Initialize LLM provider
+        self.llm_provider = LLMProvider()
+        self.set_provider(provider_name)
+        
         self.min_confidence_threshold = 0.5
 
+    def set_provider(self, provider_name: str) -> None:
+        self.llm = self.llm_provider.get_provider(provider_name)
+        if not self.llm:
+            raise ValueError(f"Provider {provider_name} not available")
+        self.current_provider = provider_name
+
+    def get_available_providers(self) -> list[str]:
+        return self.llm_provider.get_available_providers()
+
     def get_query(self, query: str, failed_queries: List[str] = None) -> str:
-        """Generate a Tantivy syntax query using Claude, considering previously failed queries"""
+        """Generate a Tantivy query using Claude, considering previously failed queries"""
         try:
             prompt = (
                 "Create a Tantivy query for this search request using Tantivy's query syntax. "
@@ -47,17 +56,8 @@ class SearchAgent:
                     "5. Considers using IN operator for multiple alternatives"
                 )
             
-            message = self.client.messages.create(
-                # use latest sonnet 3.5
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=100,
-                temperature=0,
-                messages=[{
-                    "role": "user",
-                    "content": prompt
-                }]
-            )
-            tantivy_query = message.content[0].text.strip()  
+            response = self.llm.invoke([HumanMessage(content=prompt)])
+            tantivy_query = response.content.strip()  
             self.logger.info(f"Generated Tantivy query: {tantivy_query}")
             return tantivy_query
             
@@ -75,13 +75,7 @@ class SearchAgent:
                 )
 
         try:
-            message = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=200,
-                temperature=0,
-                messages=[{
-                    "role": "user",
-                    "content": f"""Evaluate the search results for answering this question:
+            message = self.llm.invoke([HumanMessage(content=f"""Evaluate the search results for answering this question:
                     Question: {query}
                     
                     Search Results:
@@ -91,27 +85,14 @@ class SearchAgent:
                     [line 1] Confidence score (0.0 to 1.0) indicating how well the results can answer the question. this line should include only the number return, don't include '[line 1]'
                     [line 2] ACCEPT if score >= {self.min_confidence_threshold}, REFINE if score < {self.min_confidence_threshold}. return only the word ACCEPT or REFINE.
                     [line 3] Detailed explanation of what information is present or missing, don't include '[line 3]'. it should be only in Hebrew
-                    [line 4] If REFINE, suggest a better Tantivy query using Hebrew terms, considering missing aspects. return only the Tantivy query
-
-                    following is the rules for creating a Tantivy query:
-                    {self.tantivy_agent.get_query_instructions()}
-                      "\n\nAdditional instructions for the new query: \n"
-                "1. Use only Hebrew terms for the search query\n"
-                "2. the corpus to search in is an ancient Hebrew corpus - Tora and Talmud. "
-                "3. Try to use ancient Hebrew terms and or Talmudic expressions and prevent modern words that are not common in those texts \n"      
-                    
-                    """
-                }]
-            )
-            
-            lines = message.content[0].text.replace('\n\n', '\n').split('\n')
+                             """)])
+            lines = message.content.strip().replace('\n\n', '\n').split('\n')
             confidence = float(lines[0])
             decision = lines[1].upper()
             explanation = lines[2]
             
             is_good = decision == 'ACCEPT'
-            new_query = lines[3] if not is_good and len(lines) > 3 else None
-            
+
             self.logger.info(f"Evaluation: Confidence={confidence}, Decision={decision}")
             self.logger.info(f"Explanation: {explanation}")
             
@@ -119,7 +100,7 @@ class SearchAgent:
                 "confidence": confidence,
                 "is_sufficient": is_good,
                 "explanation": explanation,
-                "new_query":new_query
+             
             }
             
         except Exception as e:
@@ -128,8 +109,7 @@ class SearchAgent:
             return {
                 "confidence": 0.0,
                 "is_sufficient": False,
-                "explanation": "",
-                "new_query": None
+                "explanation": "",         
             }
 
     def _generate_answer(self, query: str, results: List[Dict[str, Any]]) -> str:
@@ -143,13 +123,7 @@ class SearchAgent:
                 )
         
         try:
-            message = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=1000,
-                temperature=0,
-                messages=[{
-                    "role": "user",
-                    "content": f"""Based on these search results, answer this question:
+            message = self.llm.invoke([HumanMessage(content=f"""Based on these search results, answer this question:
                     Question: {query}
                     
                     Search Results:
@@ -162,10 +136,8 @@ class SearchAgent:
                     4. If any aspect of the question cannot be fully answered, acknowledge this
                     5. cite sources for each fact or information you use
                     6. The answer should be only in Hebrew
-                    """
-                }]
-            )
-            return message.content[0].text.strip()
+                    """)])
+            return message.content.strip()
             
         except Exception as e:
             self.logger.error(f"Error generating answer: {e}")
@@ -204,7 +176,6 @@ class SearchAgent:
         confidence = evaluation['confidence']
         is_sufficient = evaluation['is_sufficient']
         explanation = evaluation['explanation']
-        new_query = evaluation['new_query']
         
         
         steps.append({
@@ -216,22 +187,24 @@ class SearchAgent:
                     'status': 'accepted' if is_sufficient else 'insufficient',
                     'confidence': confidence,
                     'explanation': explanation,
-                    'new_query' : new_query
                 }
             }]
         })
         
         # Step 4: Additional searches if needed
-        attempt = 1
-        failed_queries = [initial_query]
+        attempt = 2
+        failed_queries = []
         
         while not is_sufficient and attempt < max_iterations:
+
+            # Mark query as failed
+            failed_queries.append(query)
+
             # Generate new query
-            if not new_query:
-                new_query = self.get_query(query, failed_queries)
+            new_query = self.get_query(query, failed_queries)
            
-                steps.append({
-                    'action': f'יצירת שאילתה מחדש (ניסיון {attempt+1})',
+            steps.append({
+                    'action': f'יצירת שאילתה מחדש (ניסיון {attempt})',
                     'description': 'נוצרה שאילתת חיפוש נוספת עבור מנוע החיפוש',
                     'results': [
                         {'type': 'new_query', 'content': new_query}
@@ -242,7 +215,7 @@ class SearchAgent:
             results = self.tantivy_agent.search(new_query, num_results)
             
             steps.append({
-                'action': f'חיפוש נוסף (ניסיון {attempt+1}) ',
+                'action': f'חיפוש נוסף (ניסיון {attempt}) ',
                 'description': f'מחפש במאגר עבור שאילתת חיפוש: {new_query}',
                 'results': [{'type': 'document', 'content': {
                     'title': r['title'],
@@ -258,13 +231,9 @@ class SearchAgent:
             confidence = evaluation['confidence']
             is_sufficient = evaluation['is_sufficient']
             explanation = evaluation['explanation']
-            new_query = evaluation['new_query']
-
-            if not is_sufficient:
-                failed_queries.append(query)
             
             steps.append({
-                'action': f'דירוג תוצאות (ניסיון {attempt+1})',
+                'action': f'דירוג תוצאות (ניסיון {attempt})',
                 'description': 'דירוג תוצאות חיפוש לניסיון זה',
                 'explanation': explanation,
                 'results': [{
@@ -273,7 +242,6 @@ class SearchAgent:
                         'status': 'accepted' if is_sufficient else 'insufficient',
                         'confidence': confidence,
                         'explanation': explanation,
-                        'new_query' : new_query
                     }
                 }]
             })

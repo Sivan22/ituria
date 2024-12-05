@@ -19,18 +19,32 @@ class SearchAgentUI:
         self.folder_button: Optional[ft.ElevatedButton] = None
         self.results_per_search: Optional[ft.TextField] = None
         self.max_iterations: Optional[ft.TextField] = None
+        self.provider_dropdown: Optional[ft.Dropdown] = None
 
     def main(self, page: ft.Page):
         # Store page reference
         self.page = page
         
         # Configure the page
-        page.title = "סוכן חיפוש מסמכים"
+        page.title = "סוכן חיפוש"
         page.theme_mode = ft.ThemeMode.LIGHT
         page.window_width = 1000
         page.window_height = 800
         page.window_resizable = True
         page.rtl = True  # Set RTL direction for the entire page
+
+        # Create a temporary agent to get available providers
+        temp_agent = SearchAgent(None)
+        available_providers = temp_agent.get_available_providers()        
+
+        # Provider selection dropdown
+        self.provider_dropdown = ft.Dropdown(
+            label="ספק בינה מלאכותית",
+            value=available_providers[0] if available_providers else None,
+            options=[ft.dropdown.Option(provider) for provider in available_providers],
+            width=200,
+            on_change=lambda e: self.agent.set_provider(e.control.value) if self.agent else None
+        )
 
         # the max number of iterations
         self.max_iterations = ft.TextField(
@@ -111,23 +125,24 @@ class SearchAgentUI:
                 content=ft.Card(
                     content=ft.Container(
                         content=ft.Column([
-                         
                             ft.Container(
                                 content=self.status_text,
                                 margin=ft.margin.only(bottom=20)
                             ),
                             ft.Container(
-                                content=ft.Row(
-                                    [
-                                         self.folder_button,
-                                         ft.Container(width=10),
-                                          self.folder_display,
+                                content=ft.Column([
+                                 
+                                    ft.Row(
+                                        controls=[
+                                            self.folder_button,
                                             ft.Container(expand=True),
-                                        self.max_iterations,
-                                        self.results_per_search,
-                                    ],
-                                    alignment=ft.MainAxisAlignment.END
-                                ),
+                                            self.provider_dropdown,
+                                            self.max_iterations,
+                                            self.results_per_search,
+                                        ],
+                                        alignment=ft.MainAxisAlignment.START,
+                                    ),
+                                ]),
                                 margin=ft.margin.only(bottom=20)
                             ),
                             ft.Container(
@@ -167,7 +182,10 @@ class SearchAgentUI:
                 self.tantivy_agent = TantivySearchAgent(e.path)
                 if self.tantivy_agent.validate_index():
                     # Create search agent with Tantivy agent
-                    self.agent = SearchAgent(self.tantivy_agent)
+                    self.agent = SearchAgent(
+                        self.tantivy_agent,
+                        provider_name=self.provider_dropdown.value
+                    )
                     self.status_text.value = "האינדקס נטען בהצלחה! מוכן לחיפוש."
                     self.status_text.color = ft.colors.GREEN
                     self.search_field.disabled = False
@@ -462,15 +480,7 @@ class SearchAgentUI:
                             color=ft.colors.GREY_700
                         )
                 )
-                if content['new_query']:
-                    result_widgets.append(
-                        ft.Text(
-                            f"שאילתת חיפוש חדשה: {content['new_query']}",
-                            size=11,
-                            color=ft.colors.GREY_700,
-                            text_align=ft.TextAlign.RIGHT,
-                        )
-                    )
+            
             
             elif result['type'] == 'new_query':
                 # Display next keywords to try
