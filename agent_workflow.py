@@ -9,7 +9,7 @@ from tantivy_search_agent import TantivySearchAgent
 load_dotenv()
 
 class SearchAgent:
-    def __init__(self, tantivy_agent: TantivySearchAgent, provider_name: str = "anthropic"):
+    def __init__(self, tantivy_agent: TantivySearchAgent, provider_name: str = "Claude"):
         """Initialize the search agent with Tantivy agent and LLM client"""
         self.tantivy_agent = tantivy_agent
         self.logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class SearchAgent:
             
             if failed_queries:
                 prompt += (
-                    f"\n\nהשאילתות הבאות לא מצאו תוצאות:\n"+
+                    f"\n\nPrevious failed queries:\n"+
                     '\n'.join(failed_queries)+
                     "\n\n"
                     "Please generate an alternative query that:\n"

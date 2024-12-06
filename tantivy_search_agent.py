@@ -22,64 +22,56 @@ class TantivySearchAgent:
 Instructions for generating a Tantivy query using Tantivy's query syntax.
 Here are the supported features:
 
-1. Basic Term Search:
-   - Single words match any default field
-   - Multiple words default to AND operation
-   - Field-specific: field:term (e.g., title:report)
 
-2. Boolean Operators:
+1. Boolean Operators:
+   - Multiple words default to AND operation
    - AND: term1 AND term2 (both required)
    - OR: term1 OR term2 (either term)
    - AND takes precedence over OR
    - Example: security AND (cloud OR network)
 
-3. Required/Excluded Terms:
+2. Required/Excluded Terms:
    - Required (+): +term (must contain)
    - Excluded (-): -term (must not contain)
    - Example: +security cloud -deprecated
    - Equivalent to: security AND cloud AND NOT deprecated
 
-4. Phrase Search:
+3. Phrase Search:
    - Use quotes: "exact phrase"
    - Both single/double quotes work
    - Escape quotes with \
-   - Slop operator: "term1 term2"~N
+   - Slop operator: "term1 term2"~N 
+   - use lop operator only for terms inside quotes
    - Prefix matching: "start of phrase"*
    - Example: title:"cloud security"~2
 
-5. Range Search:
-   - Inclusive: [start TO end]
-   - Exclusive: {start TO end}
-   - Mixed: [start TO end} or {start TO end]
-   - Works with text and dates
-   - Example: date:[2023-01-01T00:00:00Z TO 2023-12-31T23:59:59Z]
-
-6. Set Operations:
+4. Set Operations:
    - IN operator: field IN [value1 value2]
    - More efficient than OR
    - Example: status IN [active pending review]
 
-7. Special Features:
+5. Wildcards:
+   - ? for single character
+   - * for any number of characters
+   - Example: title:sec?rity cloud*
+
+6. Special Features:
    - All docs: * 
    - Boost terms: term^2.0 (positive numbers only)
-   - Fuzzy matching on configured fields
-   - Date format: RFC3339 (e.g., 2023-01-01T00:00:00Z)
 
+   
 Query Examples:
 1. Basic: security AND cloud
 2. Field-specific: title:security AND body:cloud
 3. Phrase with slop: "security framework"~2
 4. Complex: +title:"cloud security"^2.0 +(aws OR azure) -deprecated
-5. Range: created:[2023-01-01 TO 2023-12-31]
 6. Mixed: (title:security^2.0 OR description:security) AND status IN [active review]
 
 Tips:
-- Use field-specific searches for better precision
 - Group complex expressions with parentheses
 - Use quotes for exact phrases
 - Add + for required terms, - for excluded terms
 - Boost important terms with ^N
-- Use range queries for dates and ordered values
 """
 
     def search(self, query: str, num_results: int = 10) -> List[Dict[str, Any]]:

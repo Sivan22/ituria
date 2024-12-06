@@ -28,9 +28,9 @@ class SearchAgentUI:
         # Configure the page
         page.title = "סוכן חיפוש"
         page.theme_mode = ft.ThemeMode.LIGHT
-        page.window_width = 1000
-        page.window_height = 800
-        page.window_resizable = True
+        page.window.width = 1000
+        page.window.height = 800
+        page.window.resizable = True
         page.rtl = True  # Set RTL direction for the entire page
 
         # Create a temporary agent to get available providers
