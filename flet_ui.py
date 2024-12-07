@@ -26,7 +26,7 @@ class SearchAgentUI:
         self.page = page
         
         # Configure the page
-        page.title = "סוכן חיפוש"
+        page.title = "איתוריא"
         page.theme_mode = ft.ThemeMode.LIGHT
         page.window.width = 1000
         page.window.height = 800

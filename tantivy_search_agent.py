@@ -24,11 +24,13 @@ Here are the supported features:
 
 
 1. Boolean Operators:
-   - Multiple words default to AND operation
+
    - AND: term1 AND term2 (both required)
    - OR: term1 OR term2 (either term)
+   - Multiple words default to OR operation
    - AND takes precedence over OR
    - Example: security AND (cloud OR network)
+   - cloud network = cloud OR network
 
 2. Required/Excluded Terms:
    - Required (+): +term (must contain)
@@ -39,11 +41,12 @@ Here are the supported features:
 3. Phrase Search:
    - Use quotes: "exact phrase"
    - Both single/double quotes work
-   - Escape quotes with \
+   - Escape quotes with \\"
    - Slop operator: "term1 term2"~N 
-   - use lop operator only for terms inside quotes
+   - use slop operator only for terms inside quotes
    - Prefix matching: "start of phrase"*
-   - Example: title:"cloud security"~2
+   - Example: "cloud security"~2 
+   - the above will find "cloud framework and security "
 
 4. Set Operations:
    - IN operator: field IN [value1 value2]
@@ -53,12 +56,13 @@ Here are the supported features:
 5. Wildcards:
    - ? for single character
    - * for any number of characters
-   - Example: title:sec?rity cloud*
+   - Example: sec?rity cloud*
 
 6. Special Features:
    - All docs: * 
    - Boost terms: term^2.0 (positive numbers only)
-
+   - Example: security^2.0 cloud
+   - the above will boost security by 2.0
    
 Query Examples:
 1. Basic: security AND cloud
