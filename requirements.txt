@@ -1,9 +1,10 @@
-langchain>=0.3.9
-python-dotenv>=1.0.0
-flet>=0.21.0
-langchain-community>=0.3.9
+langchain
+python-dotenv
+flet
+langchain-community
 langchain-core
 langchain-openai
 langchain-anthropic
 langchain-ollama
-requests>=2.31.0
+requests
+tantivy

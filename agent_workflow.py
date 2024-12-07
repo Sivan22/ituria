@@ -173,8 +173,7 @@ class SearchAgent:
 
         if results.__len__() == 0:
             failed_queries.append({'query': initial_query, 'reason': 'no results'})
-
-
+            is_sufficient = False
         else:         
             all_results.extend(results)
             

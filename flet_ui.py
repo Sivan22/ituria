@@ -68,7 +68,7 @@ class SearchAgentUI:
         # Status text for indexing
         self.status_text = ft.Text(
             value="אנא בחר תיקיית אינדקס כדי להתחיל בחיפוש",
-            color=ft.colors.GREY_700,
+            color=ft.Colors.GREY_700,
             size=16,
             weight=ft.FontWeight.W_500
         )
@@ -95,7 +95,7 @@ class SearchAgentUI:
 
         self.folder_display = ft.Text(
             value="לא נבחרה תיקיית אינדקס",
-            color=ft.colors.GREY_700,
+            color=ft.Colors.GREY_700,
             size=14,
             weight=ft.FontWeight.W_400
         )
@@ -187,19 +187,19 @@ class SearchAgentUI:
                         provider_name=self.provider_dropdown.value
                     )
                     self.status_text.value = "האינדקס נטען בהצלחה! מוכן לחיפוש."
-                    self.status_text.color = ft.colors.GREEN
+                    self.status_text.color = ft.Colors.GREEN
                     self.search_field.disabled = False
                 else:
                     self.status_text.value = "תיקיית אינדקס לא תקינה. אנא בחר אינדקס תקין."
-                    self.status_text.color = ft.colors.RED
+                    self.status_text.color = ft.Colors.RED
                     self.search_field.disabled = True
             except Exception as ex:
                 self.status_text.value = f"שגיאה בטעינת האינדקס: {str(ex)}"
-                self.status_text.color = ft.colors.RED
+                self.status_text.color = ft.Colors.RED
                 self.search_field.disabled = True
         else:
             self.status_text.value = "לא נבחרה תיקייה"
-            self.status_text.color = ft.colors.GREY_700
+            self.status_text.color = ft.Colors.GREY_700
             self.search_field.disabled = True
             
         self.page.update()
@@ -207,7 +207,7 @@ class SearchAgentUI:
     def on_search(self, e):
         if not self.agent or not self.tantivy_agent:
             self.status_text.value = "אנא בחר תיקיית אינדקס תקינה תחילה"
-            self.status_text.color = ft.colors.RED
+            self.status_text.color = ft.Colors.RED
             self.page.update()
             return
 
@@ -216,8 +216,8 @@ class SearchAgentUI:
             return
 
         self.status_text.value = "מחפש..."
-        self.status_text.color = ft.colors.BLUE
-        clear_screen()
+        self.status_text.color = ft.Colors.BLUE
+        self.clear_screen()
         self.page.update()
 
         try:
@@ -236,9 +236,9 @@ class SearchAgentUI:
                             "צעדי תהליך החיפוש",
                             size=20,
                             weight=ft.FontWeight.BOLD,
-                            color=ft.colors.BLUE_700
+                            color=ft.Colors.BLUE_700
                         ),
-                        ft.Divider(height=2, color=ft.colors.BLUE_200)
+                        ft.Divider(height=2, color=ft.Colors.BLUE_200)
                     ],
                     spacing=10
                 ),
@@ -254,15 +254,15 @@ class SearchAgentUI:
                         ft.Container(
                             content=ft.Column([
                                 ft.Container(
-                                    content=ft.Text(f"{i+1}", color=ft.colors.WHITE, size=14),
-                                    bgcolor=ft.colors.BLUE,
+                                    content=ft.Text(f"{i+1}", color=ft.Colors.WHITE, size=14),
+                                    bgcolor=ft.Colors.BLUE,
                                     border_radius=50,
                                     width=30,
                                     height=30,
                                     alignment=ft.alignment.center
                                 ),
                                 ft.Container(
-                                    bgcolor=ft.colors.BLUE_200,
+                                    bgcolor=ft.Colors.BLUE_200,
                                     width=2, 
                                     height=30,                                 
                                     visible=i < len(search_results['steps']) - 1
@@ -281,12 +281,12 @@ class SearchAgentUI:
                                 ft.Text(
                                     step['action'],
                                     weight=ft.FontWeight.BOLD,
-                                    color=ft.colors.BLUE_700,
+                                    color=ft.Colors.BLUE_700,
                                     size=16
                                 ),
                                 ft.Text(
                                     step['description'],
-                                    color=ft.colors.GREY_800,
+                                    color=ft.Colors.GREY_800,
                                     size=14
                                 ),
                               
@@ -307,17 +307,17 @@ class SearchAgentUI:
                             "תשובה סופית",
                             weight=ft.FontWeight.BOLD,
                             size=20,
-                            color=ft.colors.BLUE_700
+                            color=ft.Colors.BLUE_700
                         ),
-                        ft.Divider(height=2, color=ft.colors.BLUE_200),
+                        ft.Divider(height=2, color=ft.Colors.BLUE_200),
                         ft.Container(
                             content=ft.Text(
                                 search_results['answer'],
                                 size=16,
-                                color=ft.colors.GREY_900
+                                color=ft.Colors.GREY_900
                             ),
                             padding=20,
-                            bgcolor=ft.colors.BLUE_50
+                            bgcolor=ft.Colors.BLUE_50
                         )
                     ]),
                     padding=20
@@ -334,9 +334,9 @@ class SearchAgentUI:
                             "מסמכי מקור",
                             size=20,
                             weight=ft.FontWeight.BOLD,
-                            color=ft.colors.BLUE_700
+                            color=ft.Colors.BLUE_700
                         ),
-                        ft.Divider(height=2, color=ft.colors.BLUE_200)
+                        ft.Divider(height=2, color=ft.Colors.BLUE_200)
                     ]),
                     margin=ft.margin.only(bottom=20)
                 )
@@ -350,17 +350,17 @@ class SearchAgentUI:
                                     source['title'],
                                     weight=ft.FontWeight.BOLD,
                                     size=16,
-                                    color=ft.colors.BLUE_700
+                                    color=ft.Colors.BLUE_700
                                 ),
                                 ft.Text(
                                     f"ציון: {source['score']:.2f}",
                                     size=14,
-                                    color=ft.colors.GREY_700
+                                    color=ft.Colors.GREY_700
                                 ),
                                 ft.Text(
                                     source['path'],
                                     size=12,
-                                    color=ft.colors.GREY_600,
+                                    color=ft.Colors.GREY_600,
                                     italic=True
                                 ),
                                 ft.Container(
@@ -368,10 +368,10 @@ class SearchAgentUI:
                                         ft.Text(
                                             highlight,
                                             size=14,
-                                            color=ft.colors.GREY_800
+                                            color=ft.Colors.GREY_800
                                         ) for highlight in source['highlights']
                                     ]),
-                                    bgcolor=ft.colors.BLUE_50,
+                                    bgcolor=ft.Colors.BLUE_50,
                                     padding=10,
                                     border_radius=5,
                                     margin=ft.margin.only(top=10)
@@ -384,16 +384,16 @@ class SearchAgentUI:
                     sources_container.content.controls.append(source_card)
 
             self.status_text.value = "חיפוש הושלם!"
-            self.status_text.color = ft.colors.GREEN
+            self.status_text.color = ft.Colors.GREEN
             
         except Exception as ex:
             self.status_text.value = f"שגיאת חיפוש: {str(ex)}"
-            self.status_text.color = ft.colors.RED
+            self.status_text.color = ft.Colors.RED
             self.results_column.controls.clear()
             self.results_column.controls.append(
                 ft.Text(f"שגיאה בביצוע חיפוש: {str(ex)}", 
                        size=16, 
-                       color=ft.colors.RED)
+                       color=ft.Colors.RED)
             )
             
         self.page.update()
@@ -412,7 +412,7 @@ class SearchAgentUI:
                     ft.Text(
                         f"שאילתת חיפוש נוצרה: {result['content']}",
                         size=12,
-                        color=ft.colors.GREY_700,
+                        color=ft.Colors.GREY_700,
                         text_align=ft.TextAlign.RIGHT,
                     )
                 )
@@ -433,7 +433,7 @@ class SearchAgentUI:
                                 ft.Text(
                                     f"ציון: {content['score']:.2f}",
                                     size=11,
-                                    color=ft.colors.GREY_700,
+                                    color=ft.Colors.GREY_700,
                                     weight=ft.FontWeight.BOLD,
                                     text_align=ft.TextAlign.RIGHT,
                                 ),
@@ -443,17 +443,17 @@ class SearchAgentUI:
                                     ft.Text(
                                         content['highlights'][0],
                                         size=11,
-                                        color=ft.colors.GREY_800
+                                        color=ft.Colors.GREY_800
                                     )
                                 ]),
-                                bgcolor=ft.colors.BLUE_50,
+                                bgcolor=ft.Colors.BLUE_50,
                                 padding=10,
                                 border_radius=5,
                                 margin=ft.margin.only(top=5)
                             )
                         ]),
                         padding=ft.padding.all(10),
-                        border=ft.border.all(1, ft.colors.BLUE_100),
+                        border=ft.border.all(1, ft.Colors.BLUE_100),
                         border_radius=5,
                         margin=ft.margin.only(bottom=5)
                     )
@@ -463,7 +463,7 @@ class SearchAgentUI:
                 # Display evaluation status
                 content = result['content']
                 icon = ft.icons.CHECK_CIRCLE if content['status'] == 'accepted' else ft.icons.REFRESH
-                color = ft.colors.GREEN_400 if content['status'] == 'accepted' else ft.colors.ORANGE_400
+                color = ft.Colors.GREEN_400 if content['status'] == 'accepted' else ft.Colors.ORANGE_400
                 result_widgets.append(
                     ft.Row([
                         ft.Icon(icon, color=color, size=16),
@@ -478,7 +478,7 @@ class SearchAgentUI:
                         ft.Text(
                             content['explanation'],
                             size=11,
-                            color=ft.colors.GREY_700
+                            color=ft.Colors.GREY_700
                         )
                 )
             
@@ -490,7 +490,7 @@ class SearchAgentUI:
                         content=ft.Column([
                             ft.Text(f"ניסיון הבא: {result['content']}", 
                                    size=11, 
-                                   color=ft.colors.GREY_700,
+                                   color=ft.Colors.GREY_700,
                                    text_align=ft.TextAlign.RIGHT),
                         ])
                     )
