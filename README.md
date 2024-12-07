@@ -1,27 +1,26 @@
-# סוכן חיפוש מסמכים מבוסס בינה מלאכותית
+# AI Document Search Agent
 
 ![alt text](image.png)
 
-## סקירה כללית
-פרויקט זה מיישם מערכת חיפוש ושאלות-תשובות חכמה המשלבת:
-- Tantivy לאינדוקס ואחזור מסמכים יעיל
-- Claude-3 של Anthropic לחילוץ מילות מפתח, הערכת תוצאות ויצירת תשובות
-- תהליך עבודה מותאם אישית לשיפור דיוק התשובות
+## Overview
+This project implements an intelligent document search and question-answering system that combines:
+- Elasticsearch for efficient document indexing and retrieval
+- Anthropic's Claude-3 for keyword extraction, result evaluation, and answer generation
+- Custom search refinement workflow for improved answer accuracy
 
-## תכונות
-- אינדוקס מסמכים חכם עם Tantivy לשיפור רלוונטיות החיפוש
-- חילוץ חכם של מילות מפתח משאלות בשפה טבעית
-- הערכה ושיפור אוטומטיים של תוצאות החיפוש
-- אסטרטגיית חיפוש מרובת ניסיונות עם ציוני ביטחון
-- יצירת תשובות מודעת הקשר באמצעות Claude-3
-- טיפול מקיף בשגיאות ותיעוד
-- תמיכה בשאילתות ומסמכים רב-לשוניים
-- פרמטרים מותאמים אישית לחיפוש (מספר איטרציות מקסימלי, תוצאות לחיפוש)
+## Features
+- Smart document indexing with custom analyzer for improved search relevance
+- Intelligent keyword extraction from natural language questions
+- Automated search result evaluation and refinement
+- Multi-attempt search strategy with confidence scoring
+- Context-aware answer generation using Claude-3
+- Comprehensive error handling and logging
+- Support for multilingual queries and documents
 
-## דרישות מוקדמות
-- Python 3.11 ומעלה
-- אינדקס Tantivy מאפליקציית אוצריה
-- מפתח API של Anthropic (נדרשת גישה ל-Claude-3)
+## Prerequisites
+- Python 3.11+
+- Elasticsearch 8.x running locally
+- Anthropic API Key (Claude-3 access required)
 
 ## התקנה
 1. שכפל את המאגר
@@ -30,64 +29,74 @@
 pip install -r requirements.txt
 ```
 
-3. הגדר קובץ `.env` עם האישורים שלך:
+3. Set up `.env` file with your credentials:
 ```
 ANTHROPIC_API_KEY=your_anthropic_api_key
+ELASTICSEARCH_HOST=localhost
+ELASTICSEARCH_PORT=9200
 ```
 
-## שימוש
-### התחלה מהירה
-הפעל את ממשק המשתמש של Flet כדי לראות את המערכת בפעולה:
+4. install elasticsearch:
+```
+docker run -d --name elasticsearch -p 9200:9200 -p 9300:9300 -e discovery.type=single-node -e xpack.security.enabled=false elasticsearch:8.12.1
+```
 
+## Usage
+### Quick Start
+Run the Flet UI to see the system in action with documents of your choice:
 ```bash
 python flet_ui.py
 ```
 
-ממשק המשתמש מאפשר לך:
-- לבחור תיקיית אינדקס Tantivy
-- להגדיר מספר איטרציות מקסימלי לחיפוש
-- לקבוע מספר תוצאות לחיפוש
-- לצפות בשלבי תהליך החיפוש המפורטים
-- לראות תוצאות חיפוש מודגשות
+The user interface allows you to:
+- Select a Tantivy index directory
+- Choose your preferred LLM provider (Claude, GPT, Gemini or Ollama)
+- Set maximum search iterations
+- Define number of results per search
+- View detailed search process steps
+- See highlighted search results
 
-## איך זה עובד
+## How It Works
 
-### אינדוקס מסמכים
-- המסמכים מאונדקסים מראש באמצעות Tantivy דרך אפליקציית אוצריה
-- Tantivy מספק אינדוקס מסמכים יעיל ומדויק
+### Document Indexing
+- Documents are indexed using a custom Elasticsearch analyzer
+- Supports automatic retry for connection handling
+- Configurable index settings for optimal search performance
 
-### חיפוש ויצירת תשובות
-1. **חילוץ מילות מפתח**: משתמש ב-Claude-3 לחילוץ מילות מפתח רלוונטיות מהשאלה
-2. **חיפוש מסמכים**: מבצע חיפוש Tantivy עם מילות המפתח שחולצו
-3. **הערכת תוצאות**: 
-   - מעריך תוצאות חיפוש באמצעות Claude-3
-   - מעניק ציוני ביטחון לקביעת איכות התוצאות
-   - משפר אוטומטית את החיפוש אם הביטחון נמוך
-4. **יצירת תשובות**: 
-   - מייצר תשובות מקיפות באמצעות הקשרי מסמכים רלוונטיים
-   - מבנה תשובות בצורה ברורה ומציין פערי מידע
+### Search and Answer Generation
+1. **Keyword Extraction**: Uses Claude-3 to extract relevant search keywords from the question
+2. **Document Search**: Performs Elasticsearch search with extracted keywords
+3. **Result Evaluation**: 
+   - Evaluates search results using Claude-3
+   - Assigns confidence scores to determine result quality
+   - Automatically refines search if confidence is low
+4. **Answer Generation**: 
+   - Generates comprehensive answers using relevant document contexts
+   - Structures responses clearly and acknowledges any information gaps
 
-## הגדרות
-- שנה את `tantivy_search_agent.py` כדי להתאים אישית הגדרות וניתוח Tantivy
-- התאם את `agent_workflow.py` כדי להגדיר:
-  - ספי ביטחון
-  - פרמטרים של Claude-3
-  - דרישות יצירת תשובות
-- התאם אישית את `flet_ui` כדי להתאים את חוויית/ממשק המשתמש לצרכיך
+## Configuration
+- Modify `document_indexer.py` to customize Elasticsearch settings and analysis
+- Adjust `agent_workflow.py` to configure:
+  - Maximum search attempts
+  - Confidence thresholds
+  - Claude-3 parameters
+  - Answer generation requirements
+- Customize `demo.py` to test with different questions or document sets
+- Customize `flet_ui' to fit the UX/UI to your needs
 
-## אבטחה
-- אחסן מפתחות API ונתונים רגישים במשתני סביבה
-- לעולם אל תעלה קובץ `.env` לבקרת גרסאות
-- ודא בקרות גישה נאותות לאינדקס Tantivy
+## Security
+- Store API keys and sensitive data in environment variables
+- Never commit `.env` file to version control
+- Ensure proper access controls on Elasticsearch
 
-## פתרון בעיות
-- ודא שאינדקס Tantivy קיים ונגיש
-- בדוק הרשאות מפתח API של Anthropic וגישה ל-Claude-3
-- ודא הרשאות קבצים מתאימות לספריית המסמכים
-- עיין ביומנים למידע מפורט על שגיאות
+## Troubleshooting
+- Verify Elasticsearch is running and accessible
+- Check Anthropic API key permissions and Claude-3 access
+- Ensure proper file permissions for document directory
+- Review logs for detailed error information
 
-## תרומה
-תרומות מתקבלות בברכה! אנא שלח בקשות משיכה או פתח סוגיות עבור באגים ובקשות תכונות.
+## Contributing
+Contributions are welcome! Please submit pull requests or open issues for bugs and feature requests.
 
 ## רישיון
 MIT
