@@ -1,5 +1,5 @@
 import flet as ft
-from document_indexer import DocumentIndexer
+from tantivy_search_agent import TantivySearchAgent
 from agent_workflow import SearchAgent
 import os
 from typing import Optional
@@ -67,8 +67,8 @@ class SearchAgentUI:
   
         # Status text for indexing
         self.status_text = ft.Text(
-            value="Initializing system...",
-            color=ft.colors.GREY_700,
+            value="אנא בחר תיקיית אינדקס כדי להתחיל בחיפוש",
+            color=ft.Colors.GREY_700,
             size=16,
             weight=ft.FontWeight.W_500
         )
@@ -94,8 +94,8 @@ class SearchAgentUI:
         )
 
         self.folder_display = ft.Text(
-            value="No folder selected",
-            color=ft.colors.GREY_700,
+            value="לא נבחרה תיקיית אינדקס",
+            color=ft.Colors.GREY_700,
             size=14,
             weight=ft.FontWeight.W_400
         )
@@ -176,315 +176,245 @@ class SearchAgentUI:
     def on_folder_picked(self, e: ft.FilePickerResultEvent):
         if e.path:
             self.selected_folder = e.path
-            self.folder_display.value = f"Selected: {e.path}"
-            self.status_text.value = "Indexing documents..."
-            e.page.update()
-            
+            self.folder_display.value = f"אינדקס נבחר: {os.path.basename(e.path)}"
             try:
-                num_docs = self.indexer.index_documents(e.path)
-                self.status_text.value = f"Ready to search! ({num_docs} documents indexed)"
-                e.page.update()
-            except FileNotFoundError:
-                self.status_text.value = "Error: Selected folder not found or inaccessible"
-                e.page.update()
+                # Initialize both Tantivy agent and search agent
+                self.tantivy_agent = TantivySearchAgent(e.path)
+                if self.tantivy_agent.validate_index():
+                    # Create search agent with Tantivy agent
+                    self.agent = SearchAgent(
+                        self.tantivy_agent,
+                        provider_name=self.provider_dropdown.value
+                    )
+                    self.status_text.value = "האינדקס נטען בהצלחה! מוכן לחיפוש."
+                    self.status_text.color = ft.Colors.GREEN
+                    self.search_field.disabled = False
+                else:
+                    self.status_text.value = "תיקיית אינדקס לא תקינה. אנא בחר אינדקס תקין."
+                    self.status_text.color = ft.Colors.RED
+                    self.search_field.disabled = True
             except Exception as ex:
-                self.status_text.value = f"Error indexing documents: {str(ex)}"
-                e.page.update()
+                self.status_text.value = f"שגיאה בטעינת האינדקס: {str(ex)}"
+                self.status_text.color = ft.Colors.RED
+                self.search_field.disabled = True
+        else:
+            self.status_text.value = "לא נבחרה תיקייה"
+            self.status_text.color = ft.Colors.GREY_700
+            self.search_field.disabled = True
+            
+        self.page.update()
 
     def on_search(self, e):
-        if e.control.value:
-            # Clear previous results
-            self.clear_screen()
-            
-            search_text = e.control.value
-            # Clear previous results
-            self.results_column.controls = []
-            e.page.update()
-            
-            # Perform search
-            self.status_text.value = "Searching..."
-            e.page.update()
-            
-            try:
-                results = self.agent.search_and_answer(search_text)  
+        if not self.agent or not self.tantivy_agent:
+            self.status_text.value = "אנא בחר תיקיית אינדקס תקינה תחילה"
+            self.status_text.color = ft.Colors.RED
+            self.page.update()
+            return
 
-                # Create a container for steps with a title
-                steps_container = ft.Container(
-                    content=ft.Column(
-                        controls=[
-                            ft.Text(
-                                "Search Process Steps",
-                                size=20,
-                                weight=ft.FontWeight.BOLD,
-                                color=ft.colors.BLUE_700
-                            ),
-                            ft.Divider(height=2, color=ft.colors.BLUE_200)
-                        ],
-                        spacing=10
-                    ),
-                    margin=ft.margin.only(bottom=20)
+        query = self.search_field.value
+        if not query:
+            return
+
+        self.status_text.value = "מחפש..."
+        self.status_text.color = ft.Colors.BLUE
+        self.clear_screen()
+        self.page.update()
+
+        try:
+            # Use the multi-step search process
+            search_results = self.agent.search_and_answer(query, 
+                                                          int(self.results_per_search.value), 
+                                                          int(self.max_iterations.value))
+
+            self.results_column.controls.clear()
+            
+            # Create a container for steps with a title
+            steps_container = ft.Container(
+                content=ft.Column(
+                    controls=[
+                        ft.Text(
+                            "צעדי תהליך החיפוש",
+                            size=20,
+                            weight=ft.FontWeight.BOLD,
+                            color=ft.Colors.BLUE_700
+                        ),
+                        ft.Divider(height=2, color=ft.Colors.BLUE_200)
+                    ],
+                    spacing=10
+                ),
+                margin=ft.margin.only(bottom=20)
+            )
+            self.results_column.controls.append(steps_container)
+
+            # Add each step with a timeline-like visualization
+            for i, step in enumerate(search_results['steps']):
+                step_row = ft.Row(
+                    controls=[
+                        # Timeline connector
+                        ft.Container(
+                            content=ft.Column(
+                                [ft.Container(
+                                    content=ft.Text(f"{i+1}", color=ft.Colors.WHITE, size=14),
+                                    bgcolor=ft.Colors.BLUE,
+                                    border_radius=50,
+                                    width=30,
+                                    height=30,
+                                    alignment=ft.alignment.center
+                                ),
+                                ft.Container(
+                                    bgcolor=ft.Colors.BLUE_200,  
+                                    width=2,
+                                    height=30,       
+                                    visible=i < len(search_results['steps']) - 1
+                                ),
+                                
+                            ],
+                        alignment=ft.MainAxisAlignment.START),                        
+                            padding=ft.padding.only(right=20),
+
+                        ),
+                        # Step content
+                        ft.Container(
+                            content=ft.Column([
+                                ft.Text(
+                                    step['action'],
+                                    weight=ft.FontWeight.BOLD,
+                                    color=ft.Colors.BLUE_700,
+                                    size=16
+                                ),
+                                ft.Text(
+                                    step['description'],
+                                    color=ft.Colors.GREY_800,
+                                    size=14
+                                ),
+                              
+                                self._create_results_view(step.get('results', []))
+                            ]),
+                            expand=True
+                        )
+                    ],
+                    alignment=ft.MainAxisAlignment.START
                 )
-                self.results_column.controls.append(steps_container)
+                steps_container.content.controls.append(step_row)
 
-                # Add each step with a timeline-like visualization
-                for i, step in enumerate(results['steps']):
-                    step_row = ft.Row(
-                        controls=[
-                            # Timeline connector
-                            ft.Container(
-                                content=ft.Column([
-                                    ft.Container(
-                                        content=ft.Text(f"{i+1}", color=ft.colors.WHITE, size=14),
-                                        bgcolor=ft.colors.BLUE,
-                                        border_radius=50,
-                                        width=30,
-                                        height=30,
-                                        alignment=ft.alignment.center
-                                    ),
-                                    ft.Container(
-                                        bgcolor=ft.colors.BLUE_200,
-                                        width=2,
-                                        height=40,
-                                        visible=i < len(results['steps']) - 1
-                                    )
-                                ]),
-                                padding=ft.padding.only(right=20)
+            # Display final answer in a card
+            answer_card = ft.Card(
+                content=ft.Container(
+                    content=ft.Column([
+                        ft.Text(
+                            "תשובה סופית",
+                            weight=ft.FontWeight.BOLD,
+                            size=20,
+                            color=ft.Colors.BLUE_700
+                        ),
+                        ft.Divider(height=2, color=ft.Colors.BLUE_200),
+                        ft.Container(
+                            content=ft.Text(
+                                search_results['answer'],
+                                size=16,
+                                color=ft.Colors.GREY_900
                             ),
-                            # Step content
-                            ft.Container(
-                                content=ft.Column([
-                                    ft.Text(
-                                        step['action'],
-                                        weight=ft.FontWeight.BOLD,
-                                        color=ft.colors.BLUE_700,
-                                        size=16
-                                    ),
-                                    ft.Text(
-                                        step['description'],
-                                        color=ft.colors.GREY_800,
-                                        size=14
-                                    ),
-                                    # Add detailed explanation for evaluation step
-                                    ft.Container(
-                                        content=ft.Text(
-                                            step.get('explanation', ''),
-                                            color=ft.colors.GREY_700,
-                                            size=12,
-                                            italic=True
+                            padding=20,
+                            bgcolor=ft.Colors.BLUE_50
+                        )
+                    ]),
+                    padding=20
+                ),
+                margin=ft.margin.only(top=20, bottom=20)
+            )
+            self.results_column.controls.append(answer_card)
+
+            # Display source documents
+            if search_results['sources']:
+                sources_container = ft.Container(
+                    content=ft.Column([
+                        ft.Text(
+                            "מסמכי מקור",
+                            size=20,
+                            weight=ft.FontWeight.BOLD,
+                            color=ft.Colors.BLUE_700
+                        ),
+                        ft.Divider(height=2, color=ft.Colors.BLUE_200),
+                        ft.ExpansionPanelList(
+                            expand_icon_color=ft.colors.BLUE,
+                            elevation=2,
+                            controls=[
+                                ft.ExpansionPanel(
+                                    header=ft.ListTile(
+                                        title=ft.Text(
+                                            source['title'],
+                                            weight=ft.FontWeight.BOLD,
+                                            size=16,
+                                            color=ft.Colors.BLUE_700
                                         ),
-                                        visible=step['action'].startswith('Result Evaluation')
-                                    ),
-                                    # Add results display
-                                    ft.Container(
-                                        content=self._create_results_view(step.get('results', [])),
-                                        padding=ft.padding.only(left=20, top=10),
-                                        visible=bool(step.get('results'))
-                                    )
-                                ]),
-                                expand=True
-                            )
-                        ],
-                        alignment=ft.MainAxisAlignment.START
-                    )
-                    steps_container.content.controls.append(step_row)
-
-                # Display final answer in a prominent card
-                answer_card = ft.Card(
-                    content=ft.Container(
-                        content=ft.Column([
-                            ft.Text(
-                                "Final Answer",
-                                weight=ft.FontWeight.BOLD,
-                                size=20,
-                                color=ft.colors.BLUE_700
-                            ),
-                            ft.Divider(height=2, color=ft.colors.BLUE_200),
-                            ft.Container(
-                                content=ft.Column([
-                                    ft.Text(
-                                        results['answer'],
-                                        size=16,
-                                        color=ft.colors.GREY_900
-                                    ),
-                                    # Show suggestion icon and text for no results case
-                                    ft.Container(
-                                        content=ft.Row([
-                                            ft.Icon(
-                                                name=ft.icons.LIGHTBULB_OUTLINE,
-                                                color=ft.colors.ORANGE_400,
-                                                size=20
+                                        subtitle=ft.Column([
+                                            ft.Text(
+                                                f"ציון: {source['score']:.2f}",
+                                                size=14,
+                                                color=ft.Colors.GREY_700
                                             ),
                                             ft.Text(
-                                                "Try using different keywords or rephrasing your question",
-                                                color=ft.colors.GREY_700,
-                                                italic=True,
-                                                size=14
-                                            )
-                                        ], spacing=10),
-                                        visible=not results['sources'],
-                                        margin=ft.margin.only(top=20)
-                                    )
-                                ]),
-                                padding=20,
-                                bgcolor=ft.colors.BLUE_50 if results['sources'] else ft.colors.ORANGE_50
-                            )
-                        ]),
-                        padding=20
-                    ),
-                    margin=ft.margin.only(top=20, bottom=20)
-                )
-                self.results_column.controls.append(answer_card)
-
-                # Display source documents if available
-                if results['sources']:
-                    sources_container = ft.Container(
-                        content=ft.Column(
-                            controls=[
-                                ft.Text(
-                                    "Source Documents",
-                                    size=20,
-                                    weight=ft.FontWeight.BOLD,
-                                    color=ft.colors.BLUE_700
-                                ),
-                                ft.Divider(height=2, color=ft.colors.BLUE_200)
-                            ],
-                            spacing=10
-                        ),
-                        margin=ft.margin.only(top=20, bottom=20)
-                    )
-                    self.results_column.controls.append(sources_container)
-
-                    # Add each source with expandable highlights
-                    for i, source in enumerate(results['sources']):
-                        # Create highlights text
-                        highlights_text = "\n\n".join(
-                            f"...{highlight}..." for highlight in source['highlights']
-                        )
-                        
-                        # Create expandable source card
-                        source_card = ft.Card(
-                            content=ft.Container(
-                                content=ft.Column([
-                                    # Source header with expand button
-                                    ft.Row([
-                                        ft.Icon(
-                                            name=ft.icons.DESCRIPTION_OUTLINED,
-                                            color=ft.colors.BLUE_700,
-                                        ),
-                                        ft.Text(
-                                            os.path.basename(source['path']),
-                                            weight=ft.FontWeight.BOLD,
-                                            color=ft.colors.BLUE_700,
-                                            size=16,
-                                            expand=True
-                                        ),
-                                        ft.Container(
-                                            content=ft.Text(
-                                                f"Score: {source['score']:.2f}",
-                                                color=ft.colors.GREY_700,
-                                                size=14
+                                                source['path'],
+                                                size=12,
+                                                color=ft.Colors.GREY_600,
+                                                italic=True
                                             ),
-                                            margin=ft.margin.only(right=10)
-                                        ),
-                                        ft.IconButton(
-                                            icon=ft.icons.EXPAND_MORE,
-                                            icon_color=ft.colors.BLUE_700,
-                                            data=f"source_{i}",
-                                            on_click=lambda e: self.toggle_source_expansion(e)
-                                        )
-                                    ]),
-                                    # Path display
-                                    ft.Container(
-                                        content=ft.Text(
-                                            source['path'],
-                                            color=ft.colors.GREY_700,
-                                            size=12,
-                                            italic=True
-                                        ),
-                                        margin=ft.margin.only(left=30, bottom=10)
+                                        ]),
                                     ),
-                                    # Expandable highlights section
-                                    ft.Container(
+                                    content=ft.Container(
                                         content=ft.Column([
                                             ft.Text(
-                                                "Relevant Excerpts:",
-                                                weight=ft.FontWeight.BOLD,
-                                                color=ft.colors.BLUE_700,
-                                                size=14
-                                            ),
-                                            ft.Container(
-                                                content=ft.Text(
-                                                    highlights_text,
-                                                    color=ft.colors.GREY_800,
-                                                    size=14
-                                                ),
-                                                bgcolor=ft.colors.BLUE_50,
-                                                padding=10,
-                                                border_radius=5
-                                            )
+                                                highlight,
+                                                size=14,
+                                                color=ft.Colors.GREY_800
+                                            ) for highlight in source['highlights']
                                         ]),
-                                        visible=False,
-                                        data=f"source_content_{i}"
-                                    )
-                                ]),
-                                padding=15
-                            ),
-                            margin=ft.margin.only(bottom=10)
+                                        bgcolor=ft.Colors.BLUE_50,
+                                        padding=10,
+                                        border_radius=5,
+                                    ),
+                                    expanded=False,  # Closed by default
+                                )
+                                for source in search_results['sources']
+                            ]
                         )
-                        sources_container.content.controls.append(source_card)
-
-                self.status_text.value = "Search completed!"
-                
-            except Exception as err:
-                self.status_text.value = f"Error: {str(err)}"
-                error_card = ft.Card(
-                    content=ft.Container(
-                        content=ft.Text(f"Error occurred: {str(err)}", color=ft.colors.RED),
-                        padding=10
-                    )
+                    ]),
+                    margin=ft.margin.only(bottom=20)
                 )
-                self.results_column.controls.append(error_card)
+                self.results_column.controls.append(sources_container)
+
+            self.status_text.value = "חיפוש הושלם!"
+            self.status_text.color = ft.Colors.GREEN
             
-            e.page.update()
-
-    def toggle_source_expansion(self, e):
-        """Toggle the visibility of source content when expand button is clicked"""
-        source_id = e.control.data  # e.g., "source_0"
-        content_id = f"source_content_{source_id.split('_')[1]}"  # e.g., "source_content_0"
-        
-        # Find the content container
-        for control in self.results_column.controls:
-            if isinstance(control, ft.Container) and control.content and isinstance(control.content, ft.Column):
-                for card in control.content.controls:
-                    if isinstance(card, ft.Card):
-                        for container in card.content.content.controls:
-                            if (isinstance(container, ft.Container) and 
-                                container.data == content_id):
-                                # Toggle visibility
-                                container.visible = not container.visible
-                                # Update icon
-                                for row in card.content.content.controls:
-                                    if isinstance(row, ft.Row):
-                                        for button in row.controls:
-                                            if (isinstance(button, ft.IconButton) and 
-                                                button.data == source_id):
-                                                button.icon = (ft.icons.EXPAND_LESS 
-                                                             if container.visible 
-                                                             else ft.icons.EXPAND_MORE)
-                                                break
-                                break
-        
-        e.page.update()
-
-    def toggle_highlights(self, e, highlights_container):
-        """Toggle visibility of highlights container and update button icon"""
-        highlights_container.visible = not highlights_container.visible
-        e.control.icon = ft.icons.EXPAND_LESS if highlights_container.visible else ft.icons.EXPAND_MORE
-        e.control.tooltip = "Hide highlights" if highlights_container.visible else "Show highlights"
-        e.page.update()
+        except Exception as ex:
+            self.status_text.value = f"שגיאת חיפוש: {str(ex)}"
+            self.status_text.color = ft.Colors.RED
+            self.results_column.controls.clear()
+            self.results_column.controls.append(
+                ft.Text(f"שגיאה בביצוע חיפוש: {str(ex)}", 
+                       size=16, 
+                       color=ft.Colors.RED)
+            )
+            
+        self.page.update()
 
     def _create_results_view(self, results):
         """Create a visual representation of step results"""
+        if not results:
+            return ft.Container(
+                content=ft.Text(
+                    "לא נמצאו תוצאות",
+                    size=14,
+                    weight=ft.FontWeight.BOLD,
+                    color=ft.Colors.RED_400
+                ),
+                padding=10,
+                border=ft.border.all(1, ft.Colors.RED_200),
+                border_radius=5,
+                margin=ft.margin.only(bottom=5),
+                bgcolor=ft.Colors.RED_50
+            )
+        
         result_widgets = []
         document_results = []
         
@@ -492,60 +422,48 @@ class SearchAgentUI:
             if result['type'] == 'query':
                 # Display keywords as chips
                 result_widgets.append(
-                    ft.Row(
-                        controls=[
-                            ft.Container(
-                                content=ft.Text(keyword, size=12),
-                                bgcolor=ft.colors.BLUE_50,
-                                padding=ft.padding.all(5),
-                                border_radius=15
-                            )
-                            for keyword in result['content']
-                        ],
-                        wrap=True,
-                        spacing=5
+                    ft.Text(
+                        f"שאילתת חיפוש נוצרה: {result['content']}",
+                        size=12,
+                        color=ft.Colors.GREY_700,
+                        text_align=ft.TextAlign.RIGHT,
                     )
                 )
                 
             elif result['type'] == 'document':
-                # Display document result with title and expandable highlights
+                # Collect document results
                 content = result['content']
-                
-                # Container for all highlights
-                highlights_container = ft.Container(
-                    content=ft.Column([
-                        ft.Text(
-                            highlight,
-                            size=11,
-                            color=ft.colors.GREY_800,
-                        ) for highlight in content['highlights']
-                    ]),
-                    visible=False,  # Initially hidden
-                )
-                
-                # Create expand button
-                expand_button = ft.IconButton(
-                    icon=ft.icons.EXPAND_MORE,
-                    icon_size=20,
-                    tooltip="Show highlights",
-                    on_click=lambda e, h=highlights_container: self.toggle_highlights(e, h)
-                )
-                
-                result_widgets.append(
+                document_results.append(
                     ft.Container(
                         content=ft.Column([
                             ft.Row([
-                                ft.Text(f" {content['title']}", 
-                                       size=12, 
-                                       weight=ft.FontWeight.BOLD,
-                                       expand=True),
-                                ft.Text(f"Score: {content['score']}", 
-                                       size=11, 
-                                       color=ft.colors.GREY_700,
-                                       weight=ft.FontWeight.BOLD),
-                                expand_button,
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                            highlights_container,
+                                ft.Text(
+                                    content['title'],
+                                    size=12,
+                                    weight=ft.FontWeight.BOLD,
+                                    expand=True
+                                ),
+                                ft.Text(
+                                    f"ציון: {content['score']:.2f}",
+                                    size=11,
+                                    color=ft.Colors.GREY_700,
+                                    weight=ft.FontWeight.BOLD,
+                                    text_align=ft.TextAlign.RIGHT,
+                                ),
+                            ]),
+                            ft.Container(
+                                content=ft.Column([
+                                    ft.Text(
+                                        content['highlights'][0],
+                                        size=11,
+                                        color=ft.Colors.GREY_800
+                                    )
+                                ]),
+                                bgcolor=ft.Colors.BLUE_50,
+                                padding=10,
+                                border_radius=5,
+                                margin=ft.margin.only(top=5)
+                            )
                         ]),
                         padding=ft.padding.all(10),
                         border=ft.border.all(1, ft.Colors.BLUE_100),
@@ -565,37 +483,69 @@ class SearchAgentUI:
                         ft.Text(
                             f"ביטחון: {content['confidence']}",
                             color=color,
-                            size=12
+                            size=12,
+                            text_align=ft.TextAlign.RIGHT,
+                        )]))
+                if content['explanation']:
+                    result_widgets.append(
+                        ft.Text(
+                            content['explanation'],
+                            size=11,
+                            color=ft.Colors.GREY_700
                         )
-                    ])
                 )
-            
             
             elif result['type'] == 'new_query':
                 # Display next keywords to try
                 result_widgets.append(
                     ft.Container(
                         content=ft.Column([
-                            ft.Text("Trying next:", size=11, color=ft.colors.GREY_700),
-                            ft.Row(
-                                controls=[
-                                    ft.Container(
-                                        content=ft.Text(keyword, size=11),
-                                        bgcolor=ft.colors.BLUE_50,
-                                        padding=ft.padding.all(5),
-                                        border_radius=15
-                                    )
-                                    for keyword in result['content']
-                                ],
-                                wrap=True,
-                                spacing=5
-                            )
+                            ft.Text(f"ניסיון הבא: {result['content']}", 
+                                   size=11, 
+                                   color=ft.Colors.GREY_700,
+                                   text_align=ft.TextAlign.RIGHT),
                         ])
                     )
                 )
         
+        if document_results:
+            # Create a single collapsible container for all documents
+            documents_container = ft.Container(
+                content=ft.Column(document_results),
+                visible=False  # Initially hidden
+            )
+            
+            # Create an expandable header for all documents
+            documents_header = ft.Container(
+                content=ft.Row([
+                    ft.IconButton(
+                        icon=ft.icons.ARROW_DROP_DOWN,
+                        on_click=lambda e, dc=documents_container: self._toggle_document_visibility(e, dc)
+                    ),
+                    ft.Text(
+                        f"נמצאו {len(document_results)} תוצאות",
+                        size=14,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.BLUE_700
+                    )
+                ]),
+                padding=10,
+                border=ft.border.all(1, ft.Colors.BLUE_200),
+                border_radius=5,
+                margin=ft.margin.only(bottom=5),
+                bgcolor=ft.Colors.BLUE_50
+            )
+            
+            result_widgets.extend([documents_header, documents_container])
+    
         return ft.Column(controls=result_widgets, spacing=5)
 
+    def _toggle_document_visibility(self, e, document_container):
+        """Toggle the visibility of document results"""
+        document_container.visible = not document_container.visible
+        # Update the icon based on the container's visibility
+        e.control.icon = ft.icons.ARROW_DROP_UP if document_container.visible else ft.icons.ARROW_DROP_DOWN
+        self.page.update()
 
 
 if __name__ == "__main__":
