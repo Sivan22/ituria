@@ -252,8 +252,8 @@ class SearchAgentUI:
                     controls=[
                         # Timeline connector
                         ft.Container(
-                            content=ft.Column([
-                                ft.Container(
+                            content=ft.Column(
+                                [ft.Container(
                                     content=ft.Text(f"{i+1}", color=ft.Colors.WHITE, size=14),
                                     bgcolor=ft.Colors.BLUE,
                                     border_radius=50,
@@ -262,18 +262,16 @@ class SearchAgentUI:
                                     alignment=ft.alignment.center
                                 ),
                                 ft.Container(
-                                    bgcolor=ft.Colors.BLUE_200,
-                                    width=2, 
-                                    height=30,                                 
+                                    bgcolor=ft.Colors.BLUE_200,  
+                                    width=2,
+                                    height=30,       
                                     visible=i < len(search_results['steps']) - 1
                                 ),
-                                ft.Container(expand=True)                          
-
-                            ]),
+                                
+                            ],
+                        alignment=ft.MainAxisAlignment.START),                        
                             padding=ft.padding.only(right=20),
-                            alignment=ft.alignment.top_center
 
-                            
                         ),
                         # Step content
                         ft.Container(
@@ -336,52 +334,54 @@ class SearchAgentUI:
                             weight=ft.FontWeight.BOLD,
                             color=ft.Colors.BLUE_700
                         ),
-                        ft.Divider(height=2, color=ft.Colors.BLUE_200)
+                        ft.Divider(height=2, color=ft.Colors.BLUE_200),
+                        ft.ExpansionPanelList(
+                            expand_icon_color=ft.colors.BLUE,
+                            elevation=2,
+                            controls=[
+                                ft.ExpansionPanel(
+                                    header=ft.ListTile(
+                                        title=ft.Text(
+                                            source['title'],
+                                            weight=ft.FontWeight.BOLD,
+                                            size=16,
+                                            color=ft.Colors.BLUE_700
+                                        ),
+                                        subtitle=ft.Column([
+                                            ft.Text(
+                                                f"ציון: {source['score']:.2f}",
+                                                size=14,
+                                                color=ft.Colors.GREY_700
+                                            ),
+                                            ft.Text(
+                                                source['path'],
+                                                size=12,
+                                                color=ft.Colors.GREY_600,
+                                                italic=True
+                                            ),
+                                        ]),
+                                    ),
+                                    content=ft.Container(
+                                        content=ft.Column([
+                                            ft.Text(
+                                                highlight,
+                                                size=14,
+                                                color=ft.Colors.GREY_800
+                                            ) for highlight in source['highlights']
+                                        ]),
+                                        bgcolor=ft.Colors.BLUE_50,
+                                        padding=10,
+                                        border_radius=5,
+                                    ),
+                                    expanded=False,  # Closed by default
+                                )
+                                for source in search_results['sources']
+                            ]
+                        )
                     ]),
                     margin=ft.margin.only(bottom=20)
                 )
                 self.results_column.controls.append(sources_container)
-
-                for source in search_results['sources']:
-                    source_card = ft.Card(
-                        content=ft.Container(
-                            content=ft.Column([
-                                ft.Text(
-                                    source['title'],
-                                    weight=ft.FontWeight.BOLD,
-                                    size=16,
-                                    color=ft.Colors.BLUE_700
-                                ),
-                                ft.Text(
-                                    f"ציון: {source['score']:.2f}",
-                                    size=14,
-                                    color=ft.Colors.GREY_700
-                                ),
-                                ft.Text(
-                                    source['path'],
-                                    size=12,
-                                    color=ft.Colors.GREY_600,
-                                    italic=True
-                                ),
-                                ft.Container(
-                                    content=ft.Column([
-                                        ft.Text(
-                                            highlight,
-                                            size=14,
-                                            color=ft.Colors.GREY_800
-                                        ) for highlight in source['highlights']
-                                    ]),
-                                    bgcolor=ft.Colors.BLUE_50,
-                                    padding=10,
-                                    border_radius=5,
-                                    margin=ft.margin.only(top=10)
-                                )
-                            ]),
-                            padding=15
-                        ),
-                        margin=ft.margin.only(bottom=10)
-                    )
-                    sources_container.content.controls.append(source_card)
 
             self.status_text.value = "חיפוש הושלם!"
             self.status_text.color = ft.Colors.GREEN
@@ -401,9 +401,22 @@ class SearchAgentUI:
     def _create_results_view(self, results):
         """Create a visual representation of step results"""
         if not results:
-            return ft.Container()
-            
+            return ft.Container(
+                content=ft.Text(
+                    "לא נמצאו תוצאות",
+                    size=14,
+                    weight=ft.FontWeight.BOLD,
+                    color=ft.Colors.RED_400
+                ),
+                padding=10,
+                border=ft.border.all(1, ft.Colors.RED_200),
+                border_radius=5,
+                margin=ft.margin.only(bottom=5),
+                bgcolor=ft.Colors.RED_50
+            )
+        
         result_widgets = []
+        document_results = []
         
         for result in results:
             if result['type'] == 'query':
@@ -418,9 +431,9 @@ class SearchAgentUI:
                 )
                 
             elif result['type'] == 'document':
-                # Display document result
+                # Collect document results
                 content = result['content']
-                result_widgets.append(
+                document_results.append(
                     ft.Container(
                         content=ft.Column([
                             ft.Row([
@@ -458,7 +471,7 @@ class SearchAgentUI:
                         margin=ft.margin.only(bottom=5)
                     )
                 )
-            
+                
             elif result['type'] == 'evaluation':
                 # Display evaluation status
                 content = result['content']
@@ -482,7 +495,6 @@ class SearchAgentUI:
                         )
                 )
             
-            
             elif result['type'] == 'new_query':
                 # Display next keywords to try
                 result_widgets.append(
@@ -496,7 +508,44 @@ class SearchAgentUI:
                     )
                 )
         
+        if document_results:
+            # Create a single collapsible container for all documents
+            documents_container = ft.Container(
+                content=ft.Column(document_results),
+                visible=False  # Initially hidden
+            )
+            
+            # Create an expandable header for all documents
+            documents_header = ft.Container(
+                content=ft.Row([
+                    ft.IconButton(
+                        icon=ft.icons.ARROW_DROP_DOWN,
+                        on_click=lambda e, dc=documents_container: self._toggle_document_visibility(e, dc)
+                    ),
+                    ft.Text(
+                        f"נמצאו {len(document_results)} תוצאות",
+                        size=14,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.BLUE_700
+                    )
+                ]),
+                padding=10,
+                border=ft.border.all(1, ft.Colors.BLUE_200),
+                border_radius=5,
+                margin=ft.margin.only(bottom=5),
+                bgcolor=ft.Colors.BLUE_50
+            )
+            
+            result_widgets.extend([documents_header, documents_container])
+    
         return ft.Column(controls=result_widgets, spacing=5)
+
+    def _toggle_document_visibility(self, e, document_container):
+        """Toggle the visibility of document results"""
+        document_container.visible = not document_container.visible
+        # Update the icon based on the container's visibility
+        e.control.icon = ft.icons.ARROW_DROP_UP if document_container.visible else ft.icons.ARROW_DROP_DOWN
+        self.page.update()
 
 
 if __name__ == "__main__":

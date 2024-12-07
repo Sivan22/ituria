@@ -161,7 +161,7 @@ class SearchAgent:
         
         steps.append({
             'action': 'חיפוש במאגר',
-            'description': f'חיפוש במאגר עבור שאילתת חיפוש: {initial_query}\n נמצאו {len(results)} תוצאות',
+            'description': f'חיפוש במאגר עבור שאילתת חיפוש: {initial_query}',
             'results': [{'type': 'document', 'content': {
                 'title': r['title'],
                 'highlights': [r['highlights'][0]],
@@ -221,7 +221,7 @@ class SearchAgent:
             
             steps.append({
                 'action': f'חיפוש נוסף (ניסיון {attempt}) ',
-                'description': f'מחפש במאגר עבור שאילתת חיפוש: {new_query}. נמצאו {len(results)} תוצאות',
+                'description': f'מחפש במאגר עבור שאילתת חיפוש: {new_query}.',
                 'results': [{'type': 'document', 'content': {
                     'title': r['title'],
                     'highlights': [r['highlights']],
