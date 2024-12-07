@@ -1,13 +1,1 @@
 .env
-<<<<<<< HEAD
-.venv
-build/flet_ui/base_library.zip
-=======
-
-__pycache__
-.venv
-build/flet_ui/base_library.zip
-__pycache__/agent_workflow.cpython-310.pyc
-__pycache__/tantivy_search_agent.cpython-310.pyc
->>>>>>> origin/main
-flet_ui.spec
