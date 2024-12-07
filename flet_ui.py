@@ -217,6 +217,7 @@ class SearchAgentUI:
 
         self.status_text.value = "מחפש..."
         self.status_text.color = ft.colors.BLUE
+        clear_screen()
         self.page.update()
 
         try:

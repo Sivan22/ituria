@@ -46,14 +46,14 @@ class SearchAgent:
             if failed_queries:
                 prompt += (
                     f"\n\nPrevious failed queries:\n"+
-                    '\n'.join(failed_queries)+
+                    '\n'.join(f"Query: {q}, Reason: {r}" for q, r in failed_queries)+
                     "\n\n"
                     "Please generate an alternative query that:\n"
                     "1. Uses different Hebrew synonyms or related terms\n"
                     "2. Tries broader or more general terms\n"
                     "3. Adjusts proximity values or uses wildcards\n"
                     "4. Simplifies complex expressions using +/- operators\n"
-                    "5. Considers using IN operator for multiple alternatives"
+                    "5. Prevents using modern words that are not common in ancient hebrew and talmud texts\n"
                 )
             
             response = self.llm.invoke([HumanMessage(content=prompt)])
@@ -81,10 +81,10 @@ class SearchAgent:
                     Search Results:
                     {context}
                     
-                    Provide evaluation in this format:
-                    [line 1] Confidence score (0.0 to 1.0) indicating how well the results can answer the question. this line should include only the number return, don't include '[line 1]'
-                    [line 2] ACCEPT if score >= {self.min_confidence_threshold}, REFINE if score < {self.min_confidence_threshold}. return only the word ACCEPT or REFINE.
-                    [line 3] Detailed explanation of what information is present or missing, don't include '[line 3]'. it should be only in Hebrew
+                    Provide evaluation in this format (3 lines):
+                    Confidence score (0.0 to 1.0) indicating how well the results can answer the question. this line should include only the number return, don't include '[line 1]'
+                    ACCEPT if score >= {self.min_confidence_threshold}, REFINE if score < {self.min_confidence_threshold}. return only the word ACCEPT or REFINE.
+                    Detailed explanation of what information is present or missing, don't include '[line 3]'. it should be only in Hebrew
                              """)])
             lines = message.content.strip().replace('\n\n', '\n').split('\n')
             confidence = float(lines[0])
@@ -115,10 +115,10 @@ class SearchAgent:
     def _generate_answer(self, query: str, results: List[Dict[str, Any]]) -> str:
         """Generate answer using Claude with improved context utilization"""
         if not results:
-            return "I couldn't find any relevant information to answer your question."
+            return "לא נמצאו תוצאות"
 
           # Prepare context from results
-        context = "\n".join(f"Result {i}. Source: {r.get('title',[])}\n Text: {r.get('text', [])}"
+        context = "\n".join(f"Result {i+1}. Source: {r.get('title',[])}\n Text: {r.get('text', [])}"
             for i, r in enumerate(results)
                 )
         
@@ -168,38 +168,44 @@ class SearchAgent:
                 'score': r['score']
             }} for r in results]
         })
-        
-        all_results.extend(results)
-        
-        # Step 3: Evaluate results
-        evaluation = self._evaluate_results(results, query)
-        confidence = evaluation['confidence']
-        is_sufficient = evaluation['is_sufficient']
-        explanation = evaluation['explanation']
-        
-        
-        steps.append({
-            'action': 'דירוג תוצאות',
-            'description': 'דירוג תוצאות חיפוש',
-            'results': [{
-                'type': 'evaluation',
-                'content': {
-                    'status': 'accepted' if is_sufficient else 'insufficient',
-                    'confidence': confidence,
-                    'explanation': explanation,
-                }
-            }]
-        })
-        
+
+        failed_queries = []
+
+        if results.__len__() == 0:
+            failed_queries.append({'query': initial_query, 'reason': 'no results'})
+
+
+        else:         
+            all_results.extend(results)
+            
+            # Step 3: Evaluate results
+            evaluation = self._evaluate_results(results, query)
+            confidence = evaluation['confidence']
+            is_sufficient = evaluation['is_sufficient']
+            explanation = evaluation['explanation']
+            
+            
+            steps.append({
+                'action': 'דירוג תוצאות',
+                'description': 'דירוג תוצאות חיפוש',
+                'results': [{
+                    'type': 'evaluation',
+                    'content': {
+                        'status': 'accepted' if is_sufficient else 'insufficient',
+                        'confidence': confidence,
+                        'explanation': explanation,
+                    }
+                }]
+            })
+
+            if not is_sufficient:
+                failed_queries.append({'query': initial_query, 'reason': explanation})
+            
         # Step 4: Additional searches if needed
         attempt = 2
-        failed_queries = []
-        
         while not is_sufficient and attempt < max_iterations:
 
-            # Mark query as failed
-            failed_queries.append(query)
-
+      
             # Generate new query
             new_query = self.get_query(query, failed_queries)
            
@@ -216,35 +222,42 @@ class SearchAgent:
             
             steps.append({
                 'action': f'חיפוש נוסף (ניסיון {attempt}) ',
-                'description': f'מחפש במאגר עבור שאילתת חיפוש: {new_query}',
+                'description': f'מחפש במאגר עבור שאילתת חיפוש: {new_query}. נמצאו {len(results)} תוצאות',
                 'results': [{'type': 'document', 'content': {
                     'title': r['title'],
                     'highlights': [r['highlights']],
                     'score': r['score']
                 }} for r in results]
             })
+
+            if results.__len__() == 0:
+                failed_queries.append({'query': new_query, 'reason': 'no results'})
             
-            all_results.extend(results)
+            else:
+                all_results.extend(results)
             
             # Re-evaluate with current results
-            evaluation = self._evaluate_results(results, query)
-            confidence = evaluation['confidence']
-            is_sufficient = evaluation['is_sufficient']
-            explanation = evaluation['explanation']
-            
-            steps.append({
-                'action': f'דירוג תוצאות (ניסיון {attempt})',
-                'description': 'דירוג תוצאות חיפוש לניסיון זה',
-                'explanation': explanation,
-                'results': [{
-                    'type': 'evaluation',
-                    'content': {
-                        'status': 'accepted' if is_sufficient else 'insufficient',
-                        'confidence': confidence,
-                        'explanation': explanation,
-                    }
-                }]
-            })
+                evaluation = self._evaluate_results(results, query)
+                confidence = evaluation['confidence']
+                is_sufficient = evaluation['is_sufficient']
+                explanation = evaluation['explanation']
+                
+                steps.append({
+                    'action': f'דירוג תוצאות (ניסיון {attempt})',
+                    'description': 'דירוג תוצאות חיפוש לניסיון זה',
+                    'explanation': explanation,
+                    'results': [{
+                        'type': 'evaluation',
+                        'content': {
+                            'status': 'accepted' if is_sufficient else 'insufficient',
+                            'confidence': confidence,
+                            'explanation': explanation,
+                        }
+                    }]
+                })
+                
+                if not is_sufficient:
+                    failed_queries.append({'query': new_query, 'reason': explanation})
             
             attempt += 1
         
