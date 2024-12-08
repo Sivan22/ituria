@@ -1,6 +1,5 @@
 # Ituria - AI-Powered Intelligent Search System
-
-![alt text](image.png)
+![alt text](image.gif)
 
 ## Overview
 This project implements an intelligent search system that utilizes a multi-stage language model approach: First, the model generates the search query, then the system searches using the search engine, the results are sent back to the model for ranking, and if necessary, a request for an additional query and search is made. At the end of the process, the language model summarizes the search results and attempts to answer the original question.

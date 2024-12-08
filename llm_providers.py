@@ -116,7 +116,7 @@ class LLMProvider:
 
         # Ollama (local)
         try:
-            self.providers['Ollama-dictaLM'] = ChatOllama(model="dictaLM")
+            self.providers['Ollama-dictalm2.0'] = ChatOllama(model="dictaLM")
         except Exception:
             pass  # Ollama not available
 
