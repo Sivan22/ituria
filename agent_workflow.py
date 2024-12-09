@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Callable
 from dotenv import load_dotenv
 from llm_providers import LLMProvider
 from langchain.schema import HumanMessage
@@ -143,23 +143,26 @@ class SearchAgent:
             self.logger.error(f"Error generating answer: {e}")
             return f"I encountered an error generating the answer: {str(e)}"
 
-    def search_and_answer(self, query: str, num_results: int = 10, max_iterations: int = 3) -> Dict[str, Any]:
-        """Execute multi-step search process using Tantivy"""
+    def search_and_answer(self, query: str, num_results: int = 10, max_iterations: int = 3, on_step: Callable[[Dict[str, Any]], None] = None) -> Dict[str, Any]:
+        """Execute multi-step search process using Tantivy with streaming updates"""
         steps = []
         all_results = []
         
         # Step 1: Generate Tantivy query
         initial_query = self.get_query(query)
-        steps.append({
+        step = {
             'action': 'יצירת שאילתת חיפוש',
             'description': 'נוצרה שאילתת חיפוש עבור מנוע החיפוש',
             'results': [{'type': 'query', 'content': initial_query}]
-        })
+        }
+        steps.append(step)
+        if on_step:
+            on_step(step)
         
         # Step 2: Initial search with Tantivy query
         results = self.tantivy_agent.search(initial_query, num_results)
         
-        steps.append({
+        step = {
             'action': 'חיפוש במאגר',
             'description': f'חיפוש במאגר עבור שאילתת חיפוש: {initial_query}',
             'results': [{'type': 'document', 'content': {
@@ -167,7 +170,10 @@ class SearchAgent:
                 'highlights': [r['highlights'][0]],
                 'score': r['score']
             }} for r in results]
-        })
+        }
+        steps.append(step)
+        if on_step:
+            on_step(step)
 
         failed_queries = []
 
@@ -183,8 +189,7 @@ class SearchAgent:
             is_sufficient = evaluation['is_sufficient']
             explanation = evaluation['explanation']
             
-            
-            steps.append({
+            step = {
                 'action': 'דירוג תוצאות',
                 'description': 'דירוג תוצאות חיפוש',
                 'results': [{
@@ -195,7 +200,10 @@ class SearchAgent:
                         'explanation': explanation,
                     }
                 }]
-            })
+            }
+            steps.append(step)
+            if on_step:
+                on_step(step)
 
             if not is_sufficient:
                 failed_queries.append({'query': initial_query, 'reason': explanation})
@@ -203,23 +211,24 @@ class SearchAgent:
         # Step 4: Additional searches if needed
         attempt = 2
         while not is_sufficient and attempt < max_iterations:
-
-      
             # Generate new query
             new_query = self.get_query(query, failed_queries)
            
-            steps.append({
-                    'action': f'יצירת שאילתה מחדש (ניסיון {attempt})',
-                    'description': 'נוצרה שאילתת חיפוש נוספת עבור מנוע החיפוש',
-                    'results': [
-                        {'type': 'new_query', 'content': new_query}
-                    ]
-                })
+            step = {
+                'action': f'יצירת שאילתה מחדש (ניסיון {attempt})',
+                'description': 'נוצרה שאילתת חיפוש נוספת עבור מנוע החיפוש',
+                'results': [
+                    {'type': 'new_query', 'content': new_query}
+                ]
+            }
+            steps.append(step)
+            if on_step:
+                on_step(step)
             
             # Search with new query
             results = self.tantivy_agent.search(new_query, num_results)
             
-            steps.append({
+            step = {
                 'action': f'חיפוש נוסף (ניסיון {attempt}) ',
                 'description': f'מחפש במאגר עבור שאילתת חיפוש: {new_query}',
                 'results': [{'type': 'document', 'content': {
@@ -227,7 +236,10 @@ class SearchAgent:
                     'highlights': [r['highlights']],
                     'score': r['score']
                 }} for r in results]
-            })
+            }
+            steps.append(step)
+            if on_step:
+                on_step(step)
 
             if results.__len__() == 0:
                 failed_queries.append({'query': new_query, 'reason': 'no results'})
@@ -235,13 +247,13 @@ class SearchAgent:
             else:
                 all_results.extend(results)
             
-            # Re-evaluate with current results
+                # Re-evaluate with current results
                 evaluation = self._evaluate_results(results, query)
                 confidence = evaluation['confidence']
                 is_sufficient = evaluation['is_sufficient']
                 explanation = evaluation['explanation']
                 
-                steps.append({
+                step = {
                     'action': f'דירוג תוצאות (ניסיון {attempt})',
                     'description': 'דירוג תוצאות חיפוש לניסיון זה',
                     'explanation': explanation,
@@ -253,7 +265,10 @@ class SearchAgent:
                             'explanation': explanation,
                         }
                     }]
-                })
+                }
+                steps.append(step)
+                if on_step:
+                    on_step(step)
                 
                 if not is_sufficient:
                     failed_queries.append({'query': new_query, 'reason': explanation})
@@ -263,7 +278,7 @@ class SearchAgent:
         # Step 5: Generate final answer
         answer = self._generate_answer(query, all_results)
         
-        return {
+        final_result = {
             'steps': steps,
             'answer': answer,
             'sources': [{
@@ -273,3 +288,13 @@ class SearchAgent:
                 'score': r['score']
             } for r in all_results]
         }
+
+        # Send final result through callback
+        if on_step:
+            on_step({
+                'action': 'סיום',
+                'description': 'החיפוש הושלם',
+                'final_result': final_result
+            })
+
+        return final_result

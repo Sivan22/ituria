@@ -3,7 +3,6 @@ from tantivy_search_agent import TantivySearchAgent
 from agent_workflow import SearchAgent
 import os
 from typing import Optional
-import time
 
 
 class SearchAgentUI:
@@ -20,6 +19,9 @@ class SearchAgentUI:
         self.results_per_search: Optional[ft.TextField] = None
         self.max_iterations: Optional[ft.TextField] = None
         self.provider_dropdown: Optional[ft.Dropdown] = None
+        self.steps_container: Optional[ft.Container] = None
+        self.answer_card: Optional[ft.Card] = None
+        self.sources_container: Optional[ft.Container] = None
 
     def main(self, page: ft.Page):
         # Store page reference
@@ -64,7 +66,6 @@ class SearchAgentUI:
             keyboard_type=ft.KeyboardType.NUMBER,
         )
 
-  
         # Status text for indexing
         self.status_text = ft.Text(
             value="אנא בחר תיקיית אינדקס כדי להתחיל בחיפוש",
@@ -131,7 +132,6 @@ class SearchAgentUI:
                             ),
                             ft.Container(
                                 content=ft.Column([
-                                 
                                     ft.Row(
                                         controls=[
                                             self.folder_button,
@@ -204,57 +204,130 @@ class SearchAgentUI:
             
         self.page.update()
 
-    def on_search(self, e):
-        if not self.agent or not self.tantivy_agent:
-            self.status_text.value = "אנא בחר תיקיית אינדקס תקינה תחילה"
-            self.status_text.color = ft.Colors.RED
-            self.page.update()
-            return
-
-        query = self.search_field.value
-        if not query:
-            return
-
-        self.status_text.value = "מחפש..."
-        self.status_text.color = ft.Colors.BLUE
-        self.clear_screen()
-        self.page.update()
-
+    def handle_step_update(self, step):
+        """Handle streaming updates from the search process"""
         try:
-            # Use the multi-step search process
-            search_results = self.agent.search_and_answer(query, 
-                                                          int(self.results_per_search.value), 
-                                                          int(self.max_iterations.value))
+            # Initialize containers if this is the first step
+            if not self.steps_container:
+                self.steps_container = ft.Container(
+                    content=ft.Column(
+                        controls=[
+                            ft.Text(
+                                "צעדי תהליך החיפוש",
+                                size=20,
+                                weight=ft.FontWeight.BOLD,
+                                color=ft.Colors.BLUE_700
+                            ),
+                            ft.Divider(height=2, color=ft.Colors.BLUE_200)
+                        ],
+                        spacing=10
+                    ),
+                    margin=ft.margin.only(bottom=20)
+                )
+                self.results_column.controls.append(self.steps_container)
 
-            self.results_column.controls.clear()
-            
-            # Create a container for steps with a title
-            steps_container = ft.Container(
-                content=ft.Column(
-                    controls=[
-                        ft.Text(
-                            "צעדי תהליך החיפוש",
-                            size=20,
-                            weight=ft.FontWeight.BOLD,
-                            color=ft.Colors.BLUE_700
-                        ),
-                        ft.Divider(height=2, color=ft.Colors.BLUE_200)
-                    ],
-                    spacing=10
-                ),
-                margin=ft.margin.only(bottom=20)
-            )
-            self.results_column.controls.append(steps_container)
+            # Check if this is the final result
+            if 'final_result' in step:
+                final_result = step['final_result']
+                
+                # Add answer card
+                self.answer_card = ft.Card(
+                    content=ft.Container(
+                        content=ft.Column([
+                            ft.Text(
+                                "תשובה סופית",
+                                weight=ft.FontWeight.BOLD,
+                                size=20,
+                                color=ft.Colors.BLUE_700
+                            ),
+                            ft.Divider(height=2, color=ft.Colors.BLUE_200),
+                            ft.Container(
+                                content=ft.Text(
+                                    final_result['answer'],
+                                    size=16,
+                                    color=ft.Colors.GREY_900
+                                ),
+                                padding=20,
+                                bgcolor=ft.Colors.BLUE_50
+                            )
+                        ]),
+                        padding=20
+                    ),
+                    margin=ft.margin.only(top=20, bottom=20)
+                )
+                self.results_column.controls.append(self.answer_card)
 
-            # Add each step with a timeline-like visualization
-            for i, step in enumerate(search_results['steps']):
+                # Add sources if available
+                if final_result['sources']:
+                    self.sources_container = ft.Container(
+                        content=ft.Column([
+                            ft.Text(
+                                "מסמכי מקור",
+                                size=20,
+                                weight=ft.FontWeight.BOLD,
+                                color=ft.Colors.BLUE_700
+                            ),
+                            ft.Divider(height=2, color=ft.Colors.BLUE_200),
+                            ft.ExpansionPanelList(
+                                expand_icon_color=ft.colors.BLUE,
+                                elevation=2,
+                                controls=[
+                                    ft.ExpansionPanel(
+                                        header=ft.ListTile(
+                                            title=ft.Text(
+                                                source['title'],
+                                                weight=ft.FontWeight.BOLD,
+                                                size=16,
+                                                color=ft.Colors.BLUE_700
+                                            ),
+                                            subtitle=ft.Column([
+                                                ft.Text(
+                                                    f"ציון: {source['score']:.2f}",
+                                                    size=14,
+                                                    color=ft.Colors.GREY_700
+                                                ),
+                                                ft.Text(
+                                                    source['path'],
+                                                    size=12,
+                                                    color=ft.Colors.GREY_600,
+                                                    italic=True
+                                                ),
+                                            ]),
+                                        ),
+                                        content=ft.Container(
+                                            content=ft.Column([
+                                                ft.Text(
+                                                    highlight,
+                                                    size=14,
+                                                    color=ft.Colors.GREY_800
+                                                ) for highlight in source['highlights']
+                                            ]),
+                                            bgcolor=ft.Colors.BLUE_50,
+                                            padding=10,
+                                            border_radius=5,
+                                        ),
+                                        expanded=False,
+                                    )
+                                    for source in final_result['sources']
+                                ]
+                            )
+                        ]),
+                        margin=ft.margin.only(bottom=20)
+                    )
+                    self.results_column.controls.append(self.sources_container)
+
+                self.status_text.value = "חיפוש הושלם!"
+                self.status_text.color = ft.Colors.GREEN
+            else:
+                # Add the step to the steps container
+                step_number = len(self.steps_container.content.controls) - 2  # Subtract title and divider
                 step_row = ft.Row(
                     controls=[
                         # Timeline connector
                         ft.Container(
                             content=ft.Column(
                                 [ft.Container(
-                                    content=ft.Text(f"{i+1}", color=ft.Colors.WHITE, size=14),
+                                    content=ft.Text(f"{step_number + 1}", color=ft.Colors.WHITE, size=14),
                                     bgcolor=ft.Colors.BLUE,
                                     border_radius=50,
                                     width=30,
@@ -262,16 +335,13 @@ class SearchAgentUI:
                                     alignment=ft.alignment.center
                                 ),
                                 ft.Container(
-                                    bgcolor=ft.Colors.BLUE_200,  
+                                    bgcolor=ft.Colors.BLUE_200,
                                     width=2,
-                                    height=30,       
-                                    visible=i < len(search_results['steps']) - 1
-                                ),
-                                
-                            ],
-                        alignment=ft.MainAxisAlignment.START),                        
+                                    height=30,
+                                    visible=True  # Always visible during streaming
+                                )],
+                            alignment=ft.MainAxisAlignment.START),
                             padding=ft.padding.only(right=20),
-
                         ),
                         # Step content
                         ft.Container(
@@ -287,7 +357,6 @@ class SearchAgentUI:
                                     color=ft.Colors.GREY_800,
                                     size=14
                                 ),
-                              
                                 self._create_results_view(step.get('results', []))
                             ]),
                             expand=True
@@ -295,96 +364,45 @@ class SearchAgentUI:
                     ],
                     alignment=ft.MainAxisAlignment.START
                 )
-                steps_container.content.controls.append(step_row)
+                self.steps_container.content.controls.append(step_row)
 
-            # Display final answer in a card
-            answer_card = ft.Card(
-                content=ft.Container(
-                    content=ft.Column([
-                        ft.Text(
-                            "תשובה סופית",
-                            weight=ft.FontWeight.BOLD,
-                            size=20,
-                            color=ft.Colors.BLUE_700
-                        ),
-                        ft.Divider(height=2, color=ft.Colors.BLUE_200),
-                        ft.Container(
-                            content=ft.Text(
-                                search_results['answer'],
-                                size=16,
-                                color=ft.Colors.GREY_900
-                            ),
-                            padding=20,
-                            bgcolor=ft.Colors.BLUE_50
-                        )
-                    ]),
-                    padding=20
-                ),
-                margin=ft.margin.only(top=20, bottom=20)
+            self.page.update()
+
+        except Exception as ex:
+            self.status_text.value = f"שגיאה בעדכון הממשק: {str(ex)}"
+            self.status_text.color = ft.Colors.RED
+            self.page.update()
+
+    def on_search(self, e):
+        if not self.agent or not self.tantivy_agent:
+            self.status_text.value = "אנא בחר תיקיית אינדקס תקינה תחילה"
+            self.status_text.color = ft.Colors.RED
+            self.page.update()
+            return
+
+        query = self.search_field.value
+        if not query:
+            return
+
+        self.status_text.value = "מחפש..."
+        self.status_text.color = ft.Colors.BLUE
+        self.clear_screen()
+        
+        # Reset containers
+        self.steps_container = None
+        self.answer_card = None
+        self.sources_container = None
+        
+        self.page.update()
+
+        try:
+            # Use the streaming search process
+            self.agent.search_and_answer(
+                query=query,
+                num_results=int(self.results_per_search.value),
+                max_iterations=int(self.max_iterations.value),
+                on_step=self.handle_step_update
             )
-            self.results_column.controls.append(answer_card)
-
-            # Display source documents
-            if search_results['sources']:
-                sources_container = ft.Container(
-                    content=ft.Column([
-                        ft.Text(
-                            "מסמכי מקור",
-                            size=20,
-                            weight=ft.FontWeight.BOLD,
-                            color=ft.Colors.BLUE_700
-                        ),
-                        ft.Divider(height=2, color=ft.Colors.BLUE_200),
-                        ft.ExpansionPanelList(
-                            expand_icon_color=ft.colors.BLUE,
-                            elevation=2,
-                            controls=[
-                                ft.ExpansionPanel(
-                                    header=ft.ListTile(
-                                        title=ft.Text(
-                                            source['title'],
-                                            weight=ft.FontWeight.BOLD,
-                                            size=16,
-                                            color=ft.Colors.BLUE_700
-                                        ),
-                                        subtitle=ft.Column([
-                                            ft.Text(
-                                                f"ציון: {source['score']:.2f}",
-                                                size=14,
-                                                color=ft.Colors.GREY_700
-                                            ),
-                                            ft.Text(
-                                                source['path'],
-                                                size=12,
-                                                color=ft.Colors.GREY_600,
-                                                italic=True
-                                            ),
-                                        ]),
-                                    ),
-                                    content=ft.Container(
-                                        content=ft.Column([
-                                            ft.Text(
-                                                highlight,
-                                                size=14,
-                                                color=ft.Colors.GREY_800
-                                            ) for highlight in source['highlights']
-                                        ]),
-                                        bgcolor=ft.Colors.BLUE_50,
-                                        padding=10,
-                                        border_radius=5,
-                                    ),
-                                    expanded=False,  # Closed by default
-                                )
-                                for source in search_results['sources']
-                            ]
-                        )
-                    ]),
-                    margin=ft.margin.only(bottom=20)
-                )
-                self.results_column.controls.append(sources_container)
-
-            self.status_text.value = "חיפוש הושלם!"
-            self.status_text.color = ft.Colors.GREEN
             
         except Exception as ex:
             self.status_text.value = f"שגיאת חיפוש: {str(ex)}"
@@ -395,8 +413,7 @@ class SearchAgentUI:
                        size=16, 
                        color=ft.Colors.RED)
             )
-            
-        self.page.update()
+            self.page.update()
 
     def _create_results_view(self, results):
         """Create a visual representation of step results"""

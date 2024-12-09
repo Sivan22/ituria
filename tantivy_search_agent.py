@@ -43,10 +43,9 @@ Here are the supported features:
    - Both single/double quotes work
    - Escape quotes with \\"
    - Slop operator: "term1 term2"~N 
-   - use slop operator only for terms inside quotes
-   - Prefix matching: "start of phrase"*
    - Example: "cloud security"~2 
    - the above will find "cloud framework and security "
+   - Prefix matching: "start of phrase"*
 
 4. Set Operations:
    - IN operator: field IN [value1 value2]
