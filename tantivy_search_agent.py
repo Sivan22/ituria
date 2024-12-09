@@ -4,6 +4,7 @@ import logging
 import os
 import re
 
+
 class TantivySearchAgent:
     def __init__(self, index_path: str):
         """Initialize the Tantivy search agent with the index path"""
