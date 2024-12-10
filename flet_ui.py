@@ -9,13 +9,11 @@ class SearchAgentUI:
     def __init__(self):
         self.tantivy_agent: Optional[TantivySearchAgent] = None
         self.agent: Optional[SearchAgent] = None
-        self.selected_folder: Optional[str] = None
+        self.index_path = "./index"  # Hardcoded index path
         self.status_text: Optional[ft.Text] = None
         self.search_field: Optional[ft.TextField] = None
-        self.folder_display: Optional[ft.Text] = None
         self.results_column: Optional[ft.Column] = None
         self.page: Optional[ft.Page] = None  # Store page reference
-        self.folder_button: Optional[ft.ElevatedButton] = None
         self.results_per_search: Optional[ft.TextField] = None
         self.max_iterations: Optional[ft.TextField] = None
         self.provider_dropdown: Optional[ft.Dropdown] = None
@@ -68,37 +66,10 @@ class SearchAgentUI:
 
         # Status text for indexing
         self.status_text = ft.Text(
-            value="אנא בחר תיקיית אינדקס כדי להתחיל בחיפוש",
+            value="מאתחל מערכת...",
             color=ft.Colors.GREY_700,
             size=16,
             weight=ft.FontWeight.W_500
-        )
-
-        # Directory picker
-        folder_picker = ft.FilePicker(
-            on_result=self.on_folder_picked
-        )
-        page.overlay.append(folder_picker)
-
-        def pick_folder_click(e):
-            folder_picker.get_directory_path()
-
-        self.folder_button = ft.ElevatedButton(
-            "בחר תיקיית אינדקס",
-            icon=ft.icons.FOLDER_OPEN,
-            on_click=pick_folder_click,
-            disabled=False,  # Enable immediately since we need folder selection first
-            style=ft.ButtonStyle(
-                shape=ft.RoundedRectangleBorder(radius=8),
-                padding=20
-            )
-        )
-
-        self.folder_display = ft.Text(
-            value="לא נבחרה תיקיית אינדקס",
-            color=ft.Colors.GREY_700,
-            size=14,
-            weight=ft.FontWeight.W_400
         )
 
         self.search_field = ft.TextField(
@@ -120,6 +91,26 @@ class SearchAgentUI:
             height=500
         )
 
+        # Initialize the system with hardcoded path
+        try:
+            self.tantivy_agent = TantivySearchAgent(self.index_path)
+            if self.tantivy_agent.validate_index():
+                self.agent = SearchAgent(
+                    self.tantivy_agent,
+                    provider_name=self.provider_dropdown.value
+                )
+                self.status_text.value = "המערכת מוכנה לחיפוש"
+                self.status_text.color = ft.Colors.GREEN
+                self.search_field.disabled = False
+            else:
+                self.status_text.value = "שגיאה: אינדקס לא תקין"
+                self.status_text.color = ft.Colors.RED
+                self.search_field.disabled = True
+        except Exception as ex:
+            self.status_text.value = f"שגיאה באתחול המערכת: {str(ex)}"
+            self.status_text.color = ft.Colors.RED
+            self.search_field.disabled = True
+
         # Layout with Container and Card
         page.add(
             ft.Container(
@@ -134,7 +125,6 @@ class SearchAgentUI:
                                 content=ft.Column([
                                     ft.Row(
                                         controls=[
-                                            self.folder_button,
                                             ft.Container(expand=True),
                                             self.provider_dropdown,
                                             self.max_iterations,
@@ -172,37 +162,6 @@ class SearchAgentUI:
     def initialize_system(self):
         """This method is no longer needed as we're using Tantivy directly"""
         pass
-
-    def on_folder_picked(self, e: ft.FilePickerResultEvent):
-        if e.path:
-            self.selected_folder = e.path
-            self.folder_display.value = f"אינדקס נבחר: {os.path.basename(e.path)}"
-            try:
-                # Initialize both Tantivy agent and search agent
-                self.tantivy_agent = TantivySearchAgent(e.path)
-                if self.tantivy_agent.validate_index():
-                    # Create search agent with Tantivy agent
-                    self.agent = SearchAgent(
-                        self.tantivy_agent,
-                        provider_name=self.provider_dropdown.value
-                    )
-                    self.status_text.value = "האינדקס נטען בהצלחה! מוכן לחיפוש."
-                    self.status_text.color = ft.Colors.GREEN
-                    self.search_field.disabled = False
-                else:
-                    self.status_text.value = "תיקיית אינדקס לא תקינה. אנא בחר אינדקס תקין."
-                    self.status_text.color = ft.Colors.RED
-                    self.search_field.disabled = True
-            except Exception as ex:
-                self.status_text.value = f"שגיאה בטעינת האינדקס: {str(ex)}"
-                self.status_text.color = ft.Colors.RED
-                self.search_field.disabled = True
-        else:
-            self.status_text.value = "לא נבחרה תיקייה"
-            self.status_text.color = ft.Colors.GREY_700
-            self.search_field.disabled = True
-            
-        self.page.update()
 
     def handle_step_update(self, step):
         """Handle streaming updates from the search process"""

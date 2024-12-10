@@ -5,3 +5,4 @@ dist
 flet_ui.spec
 web_ui/node_modules
 web_ui/.nuxt
+index
