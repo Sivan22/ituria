@@ -46,6 +46,13 @@ Run the Flet UI to see the system in action:
 python flet_ui.py
 ```
 
+### run the web UI
+make sure to put the index in the same directory or specify the path in `web_ui/server/main.py`
+
+```bash
+node web_ui/start.js
+```
+
 The user interface allows you to:
 - Select a Tantivy index directory
 - Choose your preferred LLM provider (Claude, GPT, Gemini or Ollama)
