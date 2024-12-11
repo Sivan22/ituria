@@ -20,26 +20,31 @@ class TantivySearchAgent:
     def get_query_instructions(self) -> str:
         """Return instructions for the LLM on how to parse and construct Tantivy queries"""
         return """
-Instructions for generating a Tantivy query using Tantivy's query syntax.
-Here are the supported features:
-
+Instructions for generating a query:
 
 1. Boolean Operators:
 
    - AND: term1 AND term2 (both required)
    - OR: term1 OR term2 (either term)
-   - Multiple words default to OR operation
+   - Multiple words default to OR operation (cloud network = cloud OR network)
    - AND takes precedence over OR
-   - Example: security AND (cloud OR network)
-   - cloud network = cloud OR network
+   - Example: Shabath AND (walk OR go)
 
-2. Required/Excluded Terms:
+2. Field-specific Terms:
+   - Field-specific terms: field:term
+   - Example: text:אדם AND reference:בראשית
+   - available fields: text, reference, topics
+   - text contains the text of the document
+   - reference contains the citation of the document, e.g. בראשית, פרק א
+   - topics contains the topics of the document. available topics includes: תנך, הלכה, מדרש, etc.
+
+3. Required/Excluded Terms:
    - Required (+): +term (must contain)
    - Excluded (-): -term (must not contain)
    - Example: +security cloud -deprecated
    - Equivalent to: security AND cloud AND NOT deprecated
 
-3. Phrase Search:
+4. Phrase Search:
    - Use quotes: "exact phrase"
    - Both single/double quotes work
    - Escape quotes with \\"
@@ -47,11 +52,6 @@ Here are the supported features:
    - Example: "cloud security"~2 
    - the above will find "cloud framework and security "
    - Prefix matching: "start of phrase"*
-
-4. Set Operations:
-   - IN operator: field IN [value1 value2]
-   - More efficient than OR
-   - Example: status IN [active pending review]
 
 5. Wildcards:
    - ? for single character
@@ -65,17 +65,18 @@ Here are the supported features:
    - the above will boost security by 2.0
    
 Query Examples:
-1. Basic: security AND cloud
-2. Field-specific: title:security AND body:cloud
+1. Basic: +שבת +חולה +אסור
+2. Field-specific: text:סיני AND topics:תנך
 3. Phrase with slop: "security framework"~2
-4. Complex: +title:"cloud security"^2.0 +(aws OR azure) -deprecated
-6. Mixed: (title:security^2.0 OR description:security) AND status IN [active review]
+4. Complex: +reference:בראשית +text:"הבל"^2.0 +(דמי OR דמים) -הבלים
+6. Mixed: (text:"רבנו משה"^2.0 OR reference:"משנה תורה") AND topics:הלכה) AND text:"תורה המלך"~3 AND NOT topics:מדרש
 
 Tips:
 - Group complex expressions with parentheses
 - Use quotes for exact phrases
 - Add + for required terms, - for excluded terms
 - Boost important terms with ^N
+- use field-specific terms for better results. 
 """
 
     def search(self, query: str, num_results: int = 10) -> List[Dict[str, Any]]:
@@ -134,6 +135,8 @@ Tips:
                 result = {
                     "score": float(score),
                     "title": doc.get_first("title") or os.path.basename(doc.get_first("filePath") or ""),
+                    "reference": doc.get_first("reference"),
+                    "topics": doc.get_first("topics"),
                     "file_path": doc.get_first("filePath"),
                     "line_number": doc.get_first("segment"),
                     "is_pdf": doc.get_first("isPdf"),

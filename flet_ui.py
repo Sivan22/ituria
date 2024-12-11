@@ -3,13 +3,16 @@ from tantivy_search_agent import TantivySearchAgent
 from agent_workflow import SearchAgent
 import os
 from typing import Optional
+from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv()
 
 class SearchAgentUI:
     def __init__(self):
         self.tantivy_agent: Optional[TantivySearchAgent] = None
         self.agent: Optional[SearchAgent] = None
-        self.index_path = "./index"  # Hardcoded index path
+        self.index_path = os.getenv("INDEX_PATH", "./index")  # Get index path from env with fallback
         self.status_text: Optional[ft.Text] = None
         self.search_field: Optional[ft.TextField] = None
         self.results_column: Optional[ft.Column] = None
@@ -79,7 +82,7 @@ class SearchAgentUI:
             disabled=True,
             border_radius=8,
             filled=True,
-            prefix_icon=ft.icons.SEARCH,
+            prefix_icon=ft.Icons.SEARCH,
             hint_text="הקלד את שאילתת החיפוש שלך כאן...",
             text_align=ft.TextAlign.RIGHT,
         )
@@ -116,15 +119,12 @@ class SearchAgentUI:
             ft.Container(
                 content=ft.Card(
                     content=ft.Container(
-                        content=ft.Column([
-                            ft.Container(
-                                content=self.status_text,
-                                margin=ft.margin.only(bottom=20)
-                            ),
+                        content=ft.Column([                       
                             ft.Container(
                                 content=ft.Column([
                                     ft.Row(
                                         controls=[
+                                            self.status_text,
                                             ft.Container(expand=True),
                                             self.provider_dropdown,
                                             self.max_iterations,
@@ -234,7 +234,7 @@ class SearchAgentUI:
                                     ft.ExpansionPanel(
                                         header=ft.ListTile(
                                             title=ft.Text(
-                                                source['title'],
+                                                source['reference'],
                                                 weight=ft.FontWeight.BOLD,
                                                 size=16,
                                                 color=ft.Colors.BLUE_700
@@ -414,7 +414,7 @@ class SearchAgentUI:
                         content=ft.Column([
                             ft.Row([
                                 ft.Text(
-                                    content['title'],
+                                    content['reference'],
                                     size=12,
                                     weight=ft.FontWeight.BOLD,
                                     expand=True

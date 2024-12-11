@@ -33,27 +33,27 @@ class SearchAgent:
         """Generate a Tantivy query using Claude, considering previously failed queries"""
         try:
             prompt = (
-                "Create a Tantivy query for this search request using Tantivy's query syntax. "
-                "Return only the Tantivy query string, no other text.\n\n"+
+                "Create a query for this search request with the following restrictions:\n"+
                 self.tantivy_agent.get_query_instructions()+                
                 "\n\nAdditional instructions: \n"
-                "1. Use only Hebrew terms for the search query\n"
-                "2. the corpus to search in is an ancient Hebrew corpus - Tora and Talmud. "
-                "3. Try to use ancient Hebrew terms and or Talmudic expressions and prevent modern words that are not common in those texts \n"              
+                "1. return only the search query without any other text\n"
+                "2. Use only Hebrew terms for the search query\n"
+                "3. the corpus to search in is an ancient Hebrew corpus - Tora and Talmud. so Try to use ancient Hebrew terms and or Talmudic expressions."
+                "4. prevent modern words that are not common in talmudic texts \n"              
                 f"the search request: {query}"
             )
             
             if failed_queries:
                 prompt += (
                     f"\n\nPrevious failed queries:\n"+
+                    "------------------------\n"+                    
                     '\n'.join(f"Query: {q}, Reason: {r}" for q, r in failed_queries)+
                     "\n\n"
                     "Please generate an alternative query that:\n"
                     "1. Uses different Hebrew synonyms or related terms\n"
                     "2. Tries broader or more general terms\n"
                     "3. Adjusts proximity values or uses wildcards\n"
-                    "4. Simplifies complex expressions using +/- operators\n"
-                    "5. Prevents using modern words that are not common in ancient hebrew and talmud texts\n"
+                    "4. Prevents using modern words that are not common in ancient hebrew and talmud texts\n"
                 )
             
             response = self.llm.invoke([HumanMessage(content=prompt)])
@@ -70,7 +70,7 @@ class SearchAgent:
         """Evaluate search results using Claude with confidence scoring"""
      
        # Prepare context from results
-        context = "\n".join(f"Result {i}. Source: {r.get('title',[])}\n Text: {r.get('text', [])}"
+        context = "\n".join(f"Result {i}. Source: {r.get('reference',[])}\n Text: {r.get('text', [])}"
             for i, r in enumerate(results)
                 )
 
@@ -118,7 +118,7 @@ class SearchAgent:
             return "לא נמצאו תוצאות"
 
           # Prepare context from results
-        context = "\n".join(f"Result {i+1}. Source: {r.get('title',[])}\n Text: {r.get('text', [])}"
+        context = "\n".join(f"Result {i+1}. Source: {r.get('reference',[])}\n Text: {r.get('text', [])}"
             for i, r in enumerate(results)
                 )
         
@@ -167,6 +167,8 @@ class SearchAgent:
             'description': f'חיפוש במאגר עבור שאילתת חיפוש: {initial_query}',
             'results': [{'type': 'document', 'content': {
                 'title': r['title'],
+                'reference': r['reference'],
+                'topics': r['topics'],
                 'highlights': [r['highlights'][0]],
                 'score': r['score']
             }} for r in results]
@@ -233,6 +235,8 @@ class SearchAgent:
                 'description': f'מחפש במאגר עבור שאילתת חיפוש: {new_query}',
                 'results': [{'type': 'document', 'content': {
                     'title': r['title'],
+                    'reference': r['reference'],
+                    'topics': r['topics'],
                     'highlights': [r['highlights']],
                     'score': r['score']
                 }} for r in results]
@@ -283,6 +287,8 @@ class SearchAgent:
             'answer': answer,
             'sources': [{
                 'title': r['title'],
+                'reference': r['reference'],
+                'topics': r['topics'],
                 'path': r['file_path'],
                 'highlights': [r['text']],
                 'score': r['score']
