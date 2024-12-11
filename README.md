@@ -37,6 +37,11 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 OPENAI_API_KEY=your_openai_api_key
 GOOGLE_API_KEY=your_google_api_key
 ```
+configure the index path:
+```
+INDEX_PATH=path/to/your/index
+```
+
 
 ## Usage
 ### Quick Start
@@ -50,7 +55,7 @@ python flet_ui.py
 make sure to put the index in the same directory or specify the path in `web_ui/server/main.py`
 
 ```bash
-node web_ui/start.js
+flet run --web flet_ui.py
 ```
 
 The user interface allows you to:

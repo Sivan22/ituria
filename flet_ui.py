@@ -228,7 +228,7 @@ class SearchAgentUI:
                             ),
                             ft.Divider(height=2, color=ft.Colors.BLUE_200),
                             ft.ExpansionPanelList(
-                                expand_icon_color=ft.colors.BLUE,
+                                expand_icon_color=ft.Colors.BLUE,
                                 elevation=2,
                                 controls=[
                                     ft.ExpansionPanel(
@@ -451,7 +451,7 @@ class SearchAgentUI:
             elif result['type'] == 'evaluation':
                 # Display evaluation status
                 content = result['content']
-                icon = ft.icons.CHECK_CIRCLE if content['status'] == 'accepted' else ft.icons.REFRESH
+                icon = ft.Icons.CHECK_CIRCLE if content['status'] == 'accepted' else ft.Icons.REFRESH
                 color = ft.Colors.GREEN_400 if content['status'] == 'accepted' else ft.Colors.ORANGE_400
                 result_widgets.append(
                     ft.Row([
@@ -495,7 +495,7 @@ class SearchAgentUI:
             documents_header = ft.Container(
                 content=ft.Row([
                     ft.IconButton(
-                        icon=ft.icons.ARROW_DROP_DOWN,
+                        icon=ft.Icons.ARROW_DROP_DOWN,
                         on_click=lambda e, dc=documents_container: self._toggle_document_visibility(e, dc)
                     ),
                     ft.Text(
@@ -520,7 +520,7 @@ class SearchAgentUI:
         """Toggle the visibility of document results"""
         document_container.visible = not document_container.visible
         # Update the icon based on the container's visibility
-        e.control.icon = ft.icons.ARROW_DROP_UP if document_container.visible else ft.icons.ARROW_DROP_DOWN
+        e.control.icon = ft.Icons.ARROW_DROP_UP if document_container.visible else ft.Icons.ARROW_DROP_DOWN
         self.page.update()
 
 
