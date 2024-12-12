@@ -52,7 +52,7 @@ class SearchAgentUI:
         # the max number of iterations
         self.max_iterations = ft.TextField(
             label="מספר נסיונות מקסימלי",
-            value="3",
+            value="6",
             width=150,
             text_align=ft.TextAlign.LEFT,  # In RTL, LEFT alignment will appear on the right
             keyboard_type=ft.KeyboardType.NUMBER,
@@ -61,7 +61,7 @@ class SearchAgentUI:
         # the number of results per search
         self.results_per_search = ft.TextField(
             label="תוצאות לכל חיפוש",
-            value="5",
+            value="10",
             width=150,
             text_align=ft.TextAlign.LEFT,  # In RTL, LEFT alignment will appear on the right
             keyboard_type=ft.KeyboardType.NUMBER,
@@ -201,10 +201,9 @@ class SearchAgentUI:
                             ),
                             ft.Divider(height=2, color=ft.Colors.BLUE_200),
                             ft.Container(
-                                content=ft.Text(
+                                content=ft.Markdown(
                                     final_result['answer'],
-                                    size=16,
-                                    color=ft.Colors.GREY_900
+                                    selectable = True
                                 ),
                                 padding=20,
                                 bgcolor=ft.Colors.BLUE_50
@@ -234,7 +233,7 @@ class SearchAgentUI:
                                     ft.ExpansionPanel(
                                         header=ft.ListTile(
                                             title=ft.Text(
-                                                source['reference'],
+                                                f"[תוצאה {i+1}]: {source['reference']}",
                                                 weight=ft.FontWeight.BOLD,
                                                 size=16,
                                                 color=ft.Colors.BLUE_700
@@ -244,30 +243,22 @@ class SearchAgentUI:
                                                     f"ציון: {source['score']:.2f}",
                                                     size=14,
                                                     color=ft.Colors.GREY_700
-                                                ),
-                                                ft.Text(
-                                                    source['path'],
-                                                    size=12,
-                                                    color=ft.Colors.GREY_600,
-                                                    italic=True
-                                                ),
+                                                ),                                          
                                             ]),
                                         ),
-                                        content=ft.Container(
-                                            content=ft.Column([
-                                                ft.Text(
-                                                    highlight,
-                                                    size=14,
-                                                    color=ft.Colors.GREY_800
-                                                ) for highlight in source['highlights']
-                                            ]),
+                                        content=ft.Container(   
+                                            content=ft.Text(
+                                                source['text'],
+                                                size=14,
+                                                color=ft.Colors.GREY_800
+                                            ),
                                             bgcolor=ft.Colors.BLUE_50,
                                             padding=10,
                                             border_radius=5,
                                         ),
                                         expanded=False,
                                     )
-                                    for source in final_result['sources']
+                                    for i, source in enumerate(final_result['sources']) if final_result['sources']
                                 ]
                             )
                         ]),

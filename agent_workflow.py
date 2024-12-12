@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import List, Dict, Any, Optional, Tuple, Callable
+from typing import List, Dict, Any, Optional, Tuple, Callable, Union
 from dotenv import load_dotenv
 from llm_providers import LLMProvider
 from langchain.schema import HumanMessage
@@ -16,6 +16,7 @@ class SearchAgent:
         
         # Initialize LLM provider
         self.llm_provider = LLMProvider()
+        self.llm = None
         self.set_provider(provider_name)
         
         self.min_confidence_threshold = 0.5
@@ -29,9 +30,12 @@ class SearchAgent:
     def get_available_providers(self) -> list[str]:
         return self.llm_provider.get_available_providers()
 
-    def get_query(self, query: str, failed_queries: List[str] = None) -> str:
+    def get_query(self, query: str, failed_queries: List[Dict[str, str]] = []) -> str:
         """Generate a Tantivy query using Claude, considering previously failed queries"""
         try:
+            if not self.llm:
+                raise ValueError("LLM provider not initialized")
+
             prompt = (
                 "Create a query for this search request with the following restrictions:\n"+
                 self.tantivy_agent.get_query_instructions()+                
@@ -47,7 +51,7 @@ class SearchAgent:
                 prompt += (
                     f"\n\nPrevious failed queries:\n"+
                     "------------------------\n"+                    
-                    '\n'.join(f"Query: {q}, Reason: {r}" for q, r in failed_queries)+
+                    '\n'.join(f"Query: {q['query']}, Reason: {q['reason']}" for q in failed_queries)+
                     "\n\n"
                     "Please generate an alternative query that:\n"
                     "1. Uses different Hebrew synonyms or related terms\n"
@@ -62,14 +66,16 @@ class SearchAgent:
             return tantivy_query
             
         except Exception as e:
-            self.logger.error(f"Error generating Tantivy query: {e}")
+            self.logger.error(f"Error generating query: {e}")
             # Fallback to basic quoted search
             return f'"{query}"'
 
     def _evaluate_results(self, results: List[Dict[str, Any]], query: str) -> Dict[str, Any]:
         """Evaluate search results using Claude with confidence scoring"""
+        if not self.llm:
+            raise ValueError("LLM provider not initialized")
      
-       # Prepare context from results
+        # Prepare context from results
         context = "\n".join(f"Result {i}. Source: {r.get('reference',[])}\n Text: {r.get('text', [])}"
             for i, r in enumerate(results)
                 )
@@ -114,10 +120,13 @@ class SearchAgent:
 
     def _generate_answer(self, query: str, results: List[Dict[str, Any]]) -> str:
         """Generate answer using Claude with improved context utilization"""
+        if not self.llm:
+            raise ValueError("LLM provider not initialized")
+
         if not results:
             return "לא נמצאו תוצאות"
 
-          # Prepare context from results
+        # Prepare context from results
         context = "\n".join(f"Result {i+1}. Source: {r.get('reference',[])}\n Text: {r.get('text', [])}"
             for i, r in enumerate(results)
                 )
@@ -143,7 +152,8 @@ class SearchAgent:
             self.logger.error(f"Error generating answer: {e}")
             return f"I encountered an error generating the answer: {str(e)}"
 
-    def search_and_answer(self, query: str, num_results: int = 10, max_iterations: int = 3, on_step: Callable[[Dict[str, Any]], None] = None) -> Dict[str, Any]:
+    def search_and_answer(self, query: str, num_results: int = 10, max_iterations: int = 3, 
+                         on_step: Optional[Callable[[Dict[str, Any]], None]] = None) -> Dict[str, Any]:
         """Execute multi-step search process using Tantivy with streaming updates"""
         steps = []
         all_results = []
@@ -169,7 +179,7 @@ class SearchAgent:
                 'title': r['title'],
                 'reference': r['reference'],
                 'topics': r['topics'],
-                'highlights': [r['highlights'][0]],
+                'highlights': r['highlights'],
                 'score': r['score']
             }} for r in results]
         }
@@ -237,7 +247,7 @@ class SearchAgent:
                     'title': r['title'],
                     'reference': r['reference'],
                     'topics': r['topics'],
-                    'highlights': [r['highlights']],
+                    'highlights': r['highlights'],
                     'score': r['score']
                 }} for r in results]
             }
@@ -290,7 +300,8 @@ class SearchAgent:
                 'reference': r['reference'],
                 'topics': r['topics'],
                 'path': r['file_path'],
-                'highlights': [r['text']],
+                'highlights': r['highlights'],
+                'text': r['text'],
                 'score': r['score']
             } for r in all_results]
         }

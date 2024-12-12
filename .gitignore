@@ -6,3 +6,6 @@ flet_ui.spec
 web_ui/node_modules
 web_ui/.nuxt
 index
+.venv
+upload space.py
+flet_app.spec
