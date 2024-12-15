@@ -6,6 +6,8 @@ langchain-core
 langchain-openai
 langchain-anthropic
 langchain-ollama
+ollama
 requests
 tantivy
 streamlit
+gdown

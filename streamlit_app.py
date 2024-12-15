@@ -4,6 +4,7 @@ from agent_workflow import SearchAgent
 import os
 from typing import Optional, List
 from dotenv import load_dotenv
+import gdown
 
 # Load environment variables
 load_dotenv()
@@ -12,7 +13,29 @@ class SearchAgentUI:
     def __init__(self):
         self.tantivy_agent: Optional[TantivySearchAgent] = None
         self.agent: Optional[SearchAgent] = None
-        self.index_path = os.getenv("INDEX_PATH", "./index")
+        self.index_path ="./index" # os.getenv("INDEX_PATH", "./index")
+        # Google Drive folder ID for the index
+        self.gdrive_index_id = os.getenv("GDRIVE_INDEX_ID", "1lpbBCPimwcNfC0VZOlQueA4SHNGIp5_t")
+    def download_index_from_gdrive(self) -> bool:
+        """Download index folder from Google Drive"""
+        try:
+            # Create a temporary zip file path
+            zip_path = "index.zip"
+            # Download the folder as a zip file
+            url = f"https://drive.google.com/uc?id={self.gdrive_index_id}"
+            gdown.download(url, zip_path, quiet=False)
+            
+            # Extract the zip file
+            import zipfile
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(".")
+            
+            # Remove the zip file
+            os.remove(zip_path)
+            return True
+        except Exception as e:
+            st.error(f"Failed to download index: {str(e)}")
+            return False
 
     def get_available_providers(self) -> List[str]:
         """Get available providers without creating a SearchAgent instance"""
@@ -22,6 +45,13 @@ class SearchAgentUI:
 
     def initialize_system(self):
         try:
+            # Check if index folder exists
+            if not os.path.exists(self.index_path):
+                st.warning("Index folder not found. Attempting to download from Google Drive...")
+                if not self.download_index_from_gdrive():
+                    return False, "שגיאה: לא ניתן להוריד את האינדקס", []
+                st.success("Index downloaded successfully!")
+
             self.tantivy_agent = TantivySearchAgent(self.index_path)
             if self.tantivy_agent.validate_index():
                 available_providers = self.get_available_providers()

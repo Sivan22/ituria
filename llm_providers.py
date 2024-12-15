@@ -9,6 +9,7 @@ import requests
 import json
 from dotenv import load_dotenv
 from dataclasses import dataclass
+import ollama
 
 
 load_dotenv()
@@ -94,20 +95,26 @@ class LLMProvider:
         self.providers: Dict[str, Any] = {}
         self._setup_providers()
 
+    def _get_ollama_models(self) -> List[str]:
+        """Get list of available Ollama models using the ollama package"""
+        try:
+            models = ollama.list()
+            return [model.model for model in models['models']]
+        except Exception:
+            return []
+
     def _setup_providers(self):
         os.environ['REQUESTS_CA_BUNDLE'] = 'C:\\ProgramData\\NetFree\\CA\\netfree-ca-bundle-curl.crt'
         
-           # Google Gemini
+        # Google Gemini
         if google_key := os.getenv('GOOGLE_API_KEY'):
             self.providers['Gemini'] = GeminiProvider(api_key=google_key)
-
         
         # Anthropic
         if anthropic_key := os.getenv('ANTHROPIC_API_KEY'):
             self.providers['Claude'] = ChatAnthropic(
                 api_key=anthropic_key,
                 model_name="claude-3-5-sonnet-20241022",
-                
             )
 
         # OpenAI
@@ -117,10 +124,12 @@ class LLMProvider:
                 model_name="gpt-4o-2024-11-20"
             )
 
-     
         # Ollama (local)
         try:
-            self.providers['Ollama-dictalm2.0'] = ChatOllama(model="dictaLM")
+            # Get available Ollama models using the ollama package
+            ollama_models = self._get_ollama_models()
+            for model in ollama_models:
+                self.providers[f'Ollama-{model}'] = ChatOllama(model=model)
         except Exception:
             pass  # Ollama not available
 
