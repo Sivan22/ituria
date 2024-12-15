@@ -45,7 +45,8 @@ class SearchAgentUI:
             label="ספק בינה מלאכותית",
             value=available_providers[0] if available_providers else None,
             options=[ft.dropdown.Option(provider) for provider in available_providers],
-            width=200,
+
+            
             on_change=lambda e: self.agent.set_provider(e.control.value) if self.agent else None
         )
 
