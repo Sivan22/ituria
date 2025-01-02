@@ -5,7 +5,7 @@ import os
 import re
 
 
-class TantivySearchAgent:
+class TantivySearch:
     def __init__(self, index_path: str):
         """Initialize the Tantivy search agent with the index path"""
         self.index_path = index_path

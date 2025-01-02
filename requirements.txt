@@ -1,4 +1,5 @@
 langchain
+langgraph
 python-dotenv
 flet
 langchain-community
@@ -9,5 +10,5 @@ langchain-ollama
 ollama
 requests
 tantivy
-streamlit
 gdown
+pydantic

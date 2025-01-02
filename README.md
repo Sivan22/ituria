@@ -1,28 +1,21 @@
-# Ituria - AI-Powered Intelligent Search System
+# Ituria - A Powerful Tora assistant
 ![alt text](image.gif)
 
 ## Overview
-This project implements an intelligent search system that utilizes a multi-stage language model approach: First, the model generates the search query, then the system searches using the search engine, the results are sent back to the model for ranking, and if necessary, a request for an additional query and search is made. At the end of the process, the language model summarizes the search results and attempts to answer the original question.
+this project using the power of LLMs with the approach of Agents to provide an accurate and effective answer to users' queries.
 
 ## Features
-- Smart document indexing with Tantivy for improved search relevance
+- a Chat interface for interacting with the agent
+- the agent has the ability to search the jewish library, read a specific text or get commentaries for a specific verse
 - Flexible LLM provider support (Claude, GPT, Ollama)
-- Intelligent keyword extraction from natural language questions
-- Automatic evaluation and improvement of search results
-- Multi-attempt search strategy with confidence scoring
-- Context-aware answer generation
-- Comprehensive error handling and logging
-- Support for multilingual queries and documents
-- Customizable search parameters (max iterations, results per search)
 
 ## Prerequisites
 - Python 3.11 or higher
-- Tantivy index from Otzaria application
 - At least one of the following API keys (stored in `.env`):
   - Anthropic API key (for Claude)
   - OpenAI API key (for GPT)
   - Google API key (for Gemini)
-  - Local Ollama setup (for open-source models)
+Or a Local Ollama setup (for open-source models).
 
 ## Installation
 1. Clone the repository
@@ -45,51 +38,32 @@ INDEX_PATH=path/to/your/index
 
 ## Usage
 ### Quick Start
-Run the Flet UI to see the system in action:
+Run the Streamlit UI to see the system in action:
 
 ```bash
-python flet_ui.py
+streamlit run app.py
 ```
 
-### run the web UI
-make sure to put the index in the same directory or specify the path in `web_ui/server/main.py`
-
-```bash
-flet run --web flet_ui.py
-```
-
-The user interface allows you to:
-- Select a Tantivy index directory
-- Choose your preferred LLM provider (Claude, GPT, Gemini or Ollama)
-- Set maximum search iterations
-- Define number of results per search
-- View detailed search process steps
-- See highlighted search results
 
 ## How It Works
-The system employs a sophisticated multi-stage approach:
+The system uses a reason and act (ReAct) architecture, to achive an aoutonomous agent.
 
-1. **Query Generation**: The selected LLM analyzes the user's question and generates effective search queries
-2. **Document Search**: Utilizes Tantivy for high-performance document indexing and retrieval
-3. **Result Evaluation**: The LLM evaluates search results and determines if additional searches are needed
-4. **Answer Generation**: Synthesizes information from search results to provide comprehensive answers
+The agent can use the search engine to find relevant passages in the Jewish Library, and use those passages to answer user queries.
 
 ## Dependencies
 Key dependencies include:
 - `langchain` and related packages for LLM integration
-- `flet` for the user interface
+- `streamlit` for the user interface
 - `tantivy` for document indexing and search
 - `python-dotenv` for environment management
 - Various LLM provider packages (anthropic, openai, ollama)
 
 ## Configuration
-- Modify `tantivy_search_agent.py` to customize search settings
-- Adjust `agent_workflow.py` to configure:
-  - Confidence thresholds
-  - LLM parameters
-  - Search iteration logic
+- Modify `tantivy_search.py` to customize search settings
+- Modify `sefaria.py` to configure Sefaria API access
+- Adjust `agent.py` to configure agent behavior
 - Update `llm_providers.py` to add or modify LLM providers
-- Customize `flet_ui.py` for UI modifications
+- Customize `app.py` for UI modifications
 
 ## Security
 - Store API keys and sensitive data in environment variables
