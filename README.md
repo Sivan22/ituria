@@ -1,6 +1,8 @@
 # Ituria - A Powerful Tora assistant
 ![alt text](image.gif)
 
+watch the live demo [here](https://huggingface.co/spaces/sivan22/Ituria)
+
 ## Overview
 this project using the power of LLMs with the approach of Agents to provide an accurate and effective answer to users' queries.
 
